@@ -1,0 +1,2416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Animal Adventure!</title>
+  <style>
+    /* =========================================
+       CSS VARIABLES
+    ========================================= */
+    :root {
+      --sky-top:    #6EC6F5;
+      --sky-bottom: #B8E4FF;
+      --grass-top:  #7DC95E;
+      --grass-bot:  #5A9E3C;
+      --track-col:  #DEB887;
+      --track-brd:  #C4966A;
+      --dot-empty:  #FFFFFF;
+      --dot-done:   #FFD700;
+      --font: -apple-system, 'Chalkboard SE', 'Comic Sans MS', 'Segoe UI Rounded', sans-serif;
+      --r-lg: 24px;
+      --r-md: 16px;
+      --touch: 120px;
+    }
+
+    /* =========================================
+       RESET & BASE
+    ========================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      height: 100%;
+      /* Prevent iOS bounce overscroll */
+      overflow: hidden;
+      position: fixed;
+      width: 100%;
+    }
+
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg,
+        var(--sky-top)   0%,
+        var(--sky-bottom) 62%,
+        var(--grass-top)  62%,
+        var(--grass-bot)  100%
+      );
+      font-family: var(--font);
+      -webkit-text-size-adjust: 100%;
+      touch-action: manipulation;
+    }
+
+    /* =========================================
+       BACKGROUND LAYER (always visible)
+    ========================================= */
+    .bg-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .sun {
+      position: absolute;
+      top: 16px; right: 48px;
+      font-size: clamp(48px, 8vw, 72px);
+      animation: sun-pulse 6s ease-in-out infinite;
+      line-height: 1;
+    }
+
+    @keyframes sun-pulse {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      50%       { transform: scale(1.1) rotate(10deg); }
+    }
+
+    .cloud {
+      position: absolute;
+      font-size: clamp(40px, 7vw, 60px);
+      opacity: 0.9;
+      animation: drift linear infinite;
+      line-height: 1;
+    }
+    .cloud-1 { top: 32px;  animation-duration: 24s;  animation-delay:  0s; }
+    .cloud-2 { top: 88px;  animation-duration: 32s;  animation-delay: -14s; }
+    .cloud-3 { top: 18px;  animation-duration: 40s;  animation-delay: -26s; }
+
+    @keyframes drift {
+      from { transform: translateX(-120px); }
+      to   { transform: translateX(110vw);  }
+    }
+
+    /* =========================================
+       SCREEN VISIBILITY SYSTEM
+    ========================================= */
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+    }
+
+    #app[data-state="WELCOME"]        .screen-welcome         { display: flex; }
+    #app[data-state="SELECT_ANIMAL"]  .screen-select          { display: flex; }
+    #app[data-state="PLAYING"]        .screen-game            { display: flex; }
+    #app[data-state="CORRECT_ANIM"]   .screen-game            { display: flex; }
+    #app[data-state="WRONG_ANIM"]     .screen-game            { display: flex; }
+    #app[data-state="REWARD_PICK"]    .screen-reward          { display: flex; }
+    #app[data-state="REWARD_LOADING"] .screen-reward-loading  { display: flex; }
+    #app[data-state="WIN"]            .screen-win             { display: flex; }
+
+    /* =========================================
+       WELCOME SCREEN
+    ========================================= */
+    .screen-welcome { gap: 24px; padding: 40px 24px; }
+
+    .game-title {
+      font-size: clamp(44px, 11vw, 90px);
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 4px 5px 0 rgba(0,0,0,0.18);
+      text-align: center;
+      line-height: 1.05;
+      letter-spacing: -1px;
+    }
+
+    .title-animals {
+      font-size: clamp(52px, 13vw, 96px);
+      letter-spacing: 12px;
+      animation: bounce-row 2.2s ease-in-out infinite;
+      line-height: 1;
+    }
+
+    @keyframes bounce-row {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-12px); }
+    }
+
+    .btn-huge {
+      font-size: clamp(26px, 5.5vw, 48px);
+      font-weight: 900;
+      font-family: var(--font);
+      padding: 22px 64px;
+      background: linear-gradient(150deg, #FF7F40, #FF4500);
+      color: #fff;
+      border: none;
+      border-radius: 60px;
+      box-shadow: 0 8px 0 #C43000, 0 14px 28px rgba(0,0,0,0.28);
+      cursor: pointer;
+      min-height: var(--touch);
+      transition: transform 0.08s, box-shadow 0.08s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .btn-huge:active {
+      transform: translateY(6px);
+      box-shadow: 0 2px 0 #C43000, 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    /* Reset level button (welcome screen, parent-facing) */
+    .btn-reset-level {
+      font-size: clamp(13px, 2.5vw, 18px);
+      font-family: var(--font);
+      font-weight: 700;
+      padding: 10px 22px;
+      background: rgba(255,255,255,0.22);
+      color: #fff;
+      border: 2px solid rgba(255,255,255,0.5);
+      border-radius: 40px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .btn-reset-level:active { background: rgba(255,255,255,0.38); }
+
+    /* Level badge on game screen */
+    .level-badge {
+      position: absolute;
+      top: 6px; right: 12px;
+      background: rgba(0,0,0,0.22);
+      color: #fff;
+      font-size: clamp(13px, 2.4vw, 18px);
+      font-weight: 800;
+      padding: 5px 14px;
+      border-radius: 30px;
+      z-index: 5;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    /* Win screen level message */
+    .win-level-msg {
+      font-size: clamp(18px, 3.5vw, 28px);
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.18);
+      text-align: center;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.4s, transform 0.4s;
+      min-height: 1.4em;
+    }
+    .win-level-msg.visible { opacity: 1; transform: translateY(0); }
+
+    /* =========================================
+       SELECT ANIMAL SCREEN
+    ========================================= */
+    .screen-select { gap: 16px; padding: 20px; justify-content: flex-start; overflow-y: auto; }
+
+    .prompt-title {
+      font-size: clamp(30px, 6.5vw, 56px);
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 3px 4px 0 rgba(0,0,0,0.18);
+      text-align: center;
+    }
+
+    .animal-cards {
+      display: flex;
+      gap: clamp(12px, 3vw, 28px);
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .animal-card {
+      width:  clamp(100px, 16vw, 165px);
+      height: clamp(118px, 18vw, 185px);
+      background: #fff;
+      border-radius: var(--r-lg);
+      border: 5px solid transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.22);
+      cursor: pointer;
+      transition: transform 0.14s, border-color 0.14s, box-shadow 0.14s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .animal-card:active {
+      transform: scale(0.90);
+      border-color: #FF6B35;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    }
+
+    .card-emoji { font-size: clamp(44px, 8vw, 68px); line-height: 1; }
+    .card-name  { font-size: clamp(14px, 2.4vw, 22px); font-weight: 800; color: #333; }
+
+    /* =========================================
+       GAME SCREEN
+    ========================================= */
+    .screen-game {
+      justify-content: flex-start;
+      gap: 0;
+      padding: clamp(48px, 9vh, 80px) 0 0;
+    }
+
+    /* ---- TRACK AREA ---- */
+    .track-area {
+      position: relative;
+      width: 100%;
+      height: clamp(130px, 20vh, 175px);
+      flex-shrink: 0;
+      margin-top: 0;
+      overflow: visible;
+    }
+
+    /* Striped road */
+    .track-road {
+      position: absolute;
+      bottom: 22px;
+      left: 48px; right: 48px;
+      height: 22px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--track-col) 0px, var(--track-col) 28px,
+        var(--track-brd) 28px, var(--track-brd) 56px
+      );
+      border-radius: 11px;
+      border: 3px solid rgba(0,0,0,0.12);
+      z-index: 1;
+    }
+
+    /* Step dots + destination icon */
+    .track-markers {
+      position: absolute;
+      bottom: 10px;
+      left: 48px; right: 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      z-index: 2;
+      padding: 0 6px;
+    }
+
+    .track-dot {
+      width:  34px; height: 34px;
+      border-radius: 50%;
+      background: var(--dot-empty);
+      border: 4px solid var(--track-brd);
+      flex-shrink: 0;
+      transition: background 0.25s, border-color 0.25s;
+    }
+
+    .track-dot.done {
+      background: var(--dot-done);
+      border-color: #E8A000;
+      animation: dot-pop 0.35s ease-out both;
+    }
+
+    @keyframes dot-pop {
+      0%   { transform: scale(1);    }
+      55%  { transform: scale(1.55); }
+      100% { transform: scale(1.15); }
+    }
+
+    .track-dest-icon {
+      font-size: clamp(36px, 6vw, 50px);
+      line-height: 1;
+      flex-shrink: 0;
+      filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.22));
+    }
+
+    /* ---- ANIMAL WALKER ---- */
+    .animal-walker {
+      position: absolute;
+      bottom: 48px;
+      left: var(--animal-x, 5%);
+      transform: translateX(-50%);
+      transition: left 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 3;
+    }
+
+    .animal-char {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: idle-bounce 2.4s ease-in-out infinite;
+    }
+
+    @keyframes idle-bounce {
+      0%, 100% { transform: translateY(0px);  }
+      50%       { transform: translateY(-7px); }
+    }
+
+    .animal-emoji {
+      font-size: clamp(52px, 9vw, 72px);
+      line-height: 1;
+      display: block;
+      user-select: none;
+      transform: scaleX(-1);   /* face right — towards the destination */
+    }
+
+    /* ---- SPEECH BUBBLE ---- */
+    .speech-bubble {
+      position: absolute;
+      top: -68px;
+      left: 50%;
+      transform: translateX(-50%) scale(0);
+      background: #fff;
+      border-radius: 14px;
+      padding: 7px 14px;
+      font-size: clamp(15px, 2.8vw, 22px);
+      font-weight: 800;
+      white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+      opacity: 0;
+      transition: opacity 0.18s, transform 0.18s;
+      pointer-events: none;
+      z-index: 10;
+      color: #222;
+    }
+    .speech-bubble.visible {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -10px; left: 50%;
+      transform: translateX(-50%);
+      border: 10px solid transparent;
+      border-top-color: #fff;
+      border-bottom: none;
+    }
+
+    /* ---- FART CLOUD ---- */
+    .fart-cloud {
+      position: absolute;
+      top: -8px; right: -38px;
+      font-size: 28px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .fart-cloud.active {
+      animation: fart-poof 1s ease-out forwards;
+    }
+    @keyframes fart-poof {
+      0%   { opacity: 0; transform: scale(0.4) translateY(0);    }
+      30%  { opacity: 1; transform: scale(1.6) translateY(-8px);  }
+      70%  { opacity: 0.7; transform: scale(1.3) translateY(-22px); }
+      100% { opacity: 0; transform: scale(0.7) translateY(-40px); }
+    }
+
+    /* ---- CHALLENGE AREA ---- */
+    .challenge-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(14px, 2.5vh, 28px);
+      padding: 0 20px clamp(12px, 2vh, 24px);
+      width: 100%;
+    }
+
+    .challenge-prompt {
+      font-size: clamp(22px, 5vw, 44px);
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 3px 3px 0 rgba(0,0,0,0.18);
+      text-align: center;
+      line-height: 1.2;
+      background: rgba(0,0,0,0.14);
+      padding: 12px 30px;
+      border-radius: 60px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      transition: transform 0.1s, background 0.1s;
+    }
+    .challenge-prompt:active { transform: scale(0.96); background: rgba(0,0,0,0.25); }
+
+    /* Speaker icon that pulses while TTS is speaking */
+    .challenge-prompt .speak-icon {
+      display: inline-block;
+      margin-right: 8px;
+      font-style: normal;
+      animation: none;
+    }
+    .challenge-prompt.speaking .speak-icon {
+      animation: speaker-pulse 0.6s ease-in-out infinite alternate;
+    }
+    @keyframes speaker-pulse {
+      from { transform: scale(1);    opacity: 1;   }
+      to   { transform: scale(1.35); opacity: 0.7; }
+    }
+
+    /* ---- ANSWER GRID ---- */
+    .answer-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: clamp(10px, 2vw, 18px);
+      justify-content: center;
+      align-items: stretch;
+      width: 100%;
+      max-width: 740px;
+    }
+
+    .answer-btn {
+      flex: 1 1 clamp(110px, 26vw, 190px);
+      max-width: 210px;
+      min-height: var(--touch);
+      border-radius: var(--r-md);
+      border: 4px solid rgba(0,0,0,0.10);
+      font-size: clamp(18px, 3.5vw, 30px);
+      font-family: var(--font);
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.18);
+      transition: transform 0.08s, box-shadow 0.08s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      padding: 12px 8px;
+      background: #fff;
+      color: #333;
+    }
+    .answer-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 rgba(0,0,0,0.18);
+    }
+
+    /* Hidden until question TTS finishes */
+    .answer-grid.waiting {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s;
+    }
+    .answer-grid.ready {
+      opacity: 1;
+      pointer-events: auto;
+      transition: opacity 0.35s;
+    }
+
+    .color-swatch {
+      width: 68px; height: 68px;
+      border-radius: 50%;
+      border: 4px solid rgba(255,255,255,0.55);
+      display: block;
+      flex-shrink: 0;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.28);
+    }
+
+    .shape-svg { width: 68px; height: 68px; flex-shrink: 0; display: block; }
+
+    .option-label {
+      font-size: clamp(15px, 2.8vw, 22px);
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .number-display {
+      font-size: clamp(58px, 11vw, 88px);
+      font-weight: 900;
+      line-height: 1;
+      color: #333;
+    }
+
+    /* =========================================
+       WIN SCREEN
+    ========================================= */
+    .screen-win {
+      gap: clamp(14px, 2.5vh, 28px);
+      padding: 30px 24px;
+    }
+
+    .win-destination {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .win-dest-icon {
+      font-size: clamp(80px, 15vw, 130px);
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,0.22));
+      line-height: 1;
+    }
+
+    .win-animal-icon {
+      font-size: clamp(62px, 11vw, 96px);
+      line-height: 1;
+      margin-top: -10px;
+    }
+    .win-animal-icon.anim-jump {
+      animation: jump-in 0.85s ease-in forwards;
+    }
+    @keyframes jump-in {
+      0%   { transform: translateY(0)    rotate(0deg)  scale(1);   opacity: 1; }
+      40%  { transform: translateY(-70px) rotate(-25deg) scale(1.25); opacity: 1; }
+      100% { transform: translateY(50px)  rotate(100deg) scale(0.3);  opacity: 0; }
+    }
+
+    .win-splash {
+      font-size: clamp(32px, 6vw, 56px);
+      opacity: 0;
+      transform: scale(0);
+      line-height: 1;
+      letter-spacing: 4px;
+    }
+    .win-splash.active {
+      animation: splash-out 0.8s ease-out forwards;
+    }
+    @keyframes splash-out {
+      0%   { opacity: 0; transform: scale(0) rotate(-10deg); }
+      55%  { opacity: 1; transform: scale(1.5) rotate(5deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg);   }
+    }
+
+    .win-text {
+      font-size: clamp(26px, 5.5vw, 52px);
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 4px 4px 0 rgba(0,0,0,0.18);
+      text-align: center;
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity 0.45s, transform 0.45s;
+    }
+    .win-text.visible { opacity: 1; transform: translateY(0); }
+
+    .win-buttons {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.4s, transform 0.4s;
+    }
+    .win-buttons.visible { opacity: 1; transform: translateY(0); }
+
+    .btn-win {
+      font-size: clamp(18px, 3.5vw, 28px);
+      font-weight: 900;
+      font-family: var(--font);
+      padding: 18px 36px;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      min-height: 80px;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.24);
+      transition: transform 0.08s, box-shadow 0.08s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .btn-win:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 rgba(0,0,0,0.18);
+    }
+    .btn-replay   { background: linear-gradient(140deg, #4CAF50, #2E7D32); color: #fff; }
+    .btn-new-dest { background: linear-gradient(140deg, #FF9800, #E65100); color: #fff; }
+
+    /* =========================================
+       CHARACTER ANIMATIONS
+    ========================================= */
+    @keyframes backflip {
+      0%   { transform: scaleX(-1) rotate(0deg)   scale(1);    }
+      30%  { transform: scaleX(-1) rotate(180deg) scale(1.45); }
+      70%  { transform: scaleX(-1) rotate(360deg) scale(1.45); }
+      100% { transform: scaleX(-1) rotate(360deg) scale(1);    }
+    }
+    .anim-backflip { animation: backflip 0.65s ease-in-out; }
+
+    @keyframes sad-shake {
+      0%, 100% { transform: translateX(0)   rotate(0deg); }
+      15%       { transform: translateX(-10px) rotate(-7deg); }
+      30%       { transform: translateX(10px)  rotate(7deg);  }
+      50%       { transform: translateX(-7px)  rotate(-4deg); }
+      65%       { transform: translateX(7px)   rotate(4deg);  }
+      80%       { transform: translateX(-3px)  rotate(-2deg); }
+    }
+    .anim-shake { animation: sad-shake 0.55s ease-in-out; }
+
+    /* =========================================
+       STAR BURST (celebration particles)
+    ========================================= */
+    .star-burst {
+      position: fixed;
+      font-size: 28px;
+      pointer-events: none;
+      z-index: 99;
+      animation: star-fly 1.1s ease-out forwards;
+    }
+    @keyframes star-fly {
+      0%   { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg);   }
+      100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.4) rotate(120deg); }
+    }
+
+    /* =========================================
+       MUTE BUTTON (fixed, always on top)
+    ========================================= */
+    .btn-mute {
+      position: fixed;
+      bottom: 16px; right: 16px;
+      z-index: 50;
+      width:  52px; height: 52px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.55);
+      background: rgba(0,0,0,0.25);
+      color: #fff;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-mute:active     { transform: scale(0.90); }
+    .btn-mute.muted      { background: rgba(0,0,0,0.45); border-color: rgba(255,255,255,0.3); }
+
+    .btn-home {
+      position: fixed;
+      bottom: 16px; left: 16px;
+      z-index: 50;
+      width:  52px; height: 52px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.55);
+      background: rgba(0,0,0,0.25);
+      color: #fff;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-home:active { transform: scale(0.90); }
+    /* Hide on welcome screen — nothing to exit to */
+    #app[data-state="WELCOME"] ~ .btn-home { display: none; }
+
+    /* =========================================
+       RESPONSIVE TWEAKS
+    ========================================= */
+    @media (max-height: 680px) {
+      .track-area   { height: 120px; }
+      .animal-emoji { font-size: 46px; }
+      .speech-bubble { top: -60px; }
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+      .track-area    { height: 100px; margin-top: 4px; }
+      .track-road    { bottom: 16px; height: 16px; }
+      .track-markers { bottom: 5px; }
+      .animal-walker { bottom: 36px; }
+      .track-dot     { width: 26px; height: 26px; }
+    }
+
+    /* =========================================
+       REWARD PICK SCREEN
+    ========================================= */
+    .screen-reward {
+      gap: clamp(14px, 2.8vh, 30px);
+      padding: 28px 20px;
+    }
+
+    .reward-subtitle {
+      font-size: clamp(20px, 4vw, 36px);
+      font-weight: 800;
+      color: #fff;
+      text-shadow: 2px 3px 0 rgba(0,0,0,0.18);
+      text-align: center;
+    }
+
+    .reward-grid {
+      display: flex;
+      gap: clamp(10px, 2.5vw, 22px);
+      justify-content: center;
+      flex-wrap: wrap;
+      width: 100%;
+      max-width: 820px;
+    }
+
+    .reward-card {
+      flex: 1 1 clamp(140px, 24vw, 220px);
+      max-width: 240px;
+      min-height: clamp(150px, 22vh, 200px);
+      background: #fff;
+      border-radius: 24px;
+      border: 5px solid transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.22);
+      cursor: pointer;
+      transition: transform 0.14s, border-color 0.14s, box-shadow 0.14s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      padding: 16px 10px;
+    }
+    .reward-card:active {
+      transform: scale(0.88);
+      border-color: #FF6B35;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    }
+    .reward-card-emoji { font-size: clamp(46px, 9vw, 72px); line-height: 1; }
+    .reward-card-label {
+      font-size: clamp(14px, 2.8vw, 22px);
+      font-weight: 800;
+      color: #333;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    /* =========================================
+       REWARD LOADING SCREEN
+    ========================================= */
+    .screen-reward-loading {
+      gap: clamp(12px, 2.2vh, 22px);
+      padding: 40px 24px;
+    }
+
+    .loading-animal-big {
+      font-size: clamp(80px, 15vw, 120px);
+      line-height: 1;
+      animation: bounce-row 0.75s ease-in-out infinite;
+    }
+
+    .loading-title {
+      font-size: clamp(28px, 5.5vw, 52px);
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 3px 4px 0 rgba(0,0,0,0.18);
+      text-align: center;
+    }
+
+    .loading-msg {
+      font-size: clamp(16px, 3.2vw, 26px);
+      font-weight: 700;
+      color: rgba(255,255,255,0.9);
+      text-align: center;
+      min-height: 1.5em;
+      transition: opacity 0.4s;
+    }
+
+    .loading-dots {
+      display: flex;
+      gap: 14px;
+    }
+    .loading-dots span {
+      font-size: clamp(24px, 4vw, 36px);
+      color: #fff;
+      animation: dot-bounce 1.2s ease-in-out infinite;
+    }
+    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dot-bounce {
+      0%, 100% { transform: translateY(0);     opacity: 0.5; }
+      50%       { transform: translateY(-14px); opacity: 1;   }
+    }
+
+    .btn-skip-video {
+      font-size: clamp(14px, 2.4vw, 18px);
+      font-weight: 700;
+      font-family: var(--font);
+      padding: 10px 26px;
+      background: rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.85);
+      border: 2px solid rgba(255,255,255,0.4);
+      border-radius: 40px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      margin-top: 6px;
+      transition: background 0.15s;
+    }
+    .btn-skip-video:active { background: rgba(255,255,255,0.32); }
+
+    /* =========================================
+       WIN VIDEO
+    ========================================= */
+    .win-video-wrap {
+      width: 100%;
+      max-width: 680px;
+      max-height: 54vh;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+      display: none;
+      flex-shrink: 0;
+    }
+    .win-video-wrap.visible { display: block; }
+    #win-video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+      max-height: 54vh;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app" data-state="WELCOME">
+
+  <!-- ==================== BACKGROUND ==================== -->
+  <div class="bg-layer">
+    <div class="sun">☀️</div>
+    <div class="cloud cloud-1">☁️</div>
+    <div class="cloud cloud-2">⛅</div>
+    <div class="cloud cloud-3">☁️</div>
+  </div>
+
+  <!-- ==================== WELCOME ==================== -->
+  <section class="screen screen-welcome">
+    <h1 class="game-title">Animal<br>Adventure!</h1>
+    <div class="title-animals">🦆 🐘 🐒</div>
+    <button class="btn-huge js-start">Let's Play! 🎉</button>
+    <button class="btn-reset-level js-reset-level">⚙️ Reset Level</button>
+  </section>
+
+  <!-- ==================== SELECT ANIMAL ==================== -->
+  <section class="screen screen-select">
+    <h2 class="prompt-title">Pick your hero!</h2>
+    <div class="animal-cards">
+      <button class="animal-card js-pick-animal" data-animal="duck">
+        <span class="card-emoji">🦆</span>
+        <span class="card-name">Duck</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="elephant">
+        <span class="card-emoji">🐘</span>
+        <span class="card-name">Elephant</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="monkey">
+        <span class="card-emoji">🐒</span>
+        <span class="card-name">Monkey</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="lion">
+        <span class="card-emoji">🦁</span>
+        <span class="card-name">Lion</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="cat">
+        <span class="card-emoji">🐱</span>
+        <span class="card-name">Cat</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="dog">
+        <span class="card-emoji">🐶</span>
+        <span class="card-name">Dog</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="frog">
+        <span class="card-emoji">🐸</span>
+        <span class="card-name">Frog</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="penguin">
+        <span class="card-emoji">🐧</span>
+        <span class="card-name">Penguin</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="rabbit">
+        <span class="card-emoji">🐰</span>
+        <span class="card-name">Rabbit</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="bear">
+        <span class="card-emoji">🐻</span>
+        <span class="card-name">Bear</span>
+      </button>
+      <button class="animal-card js-pick-animal" data-animal="pig">
+        <span class="card-emoji">🐷</span>
+        <span class="card-name">Pig</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ==================== GAME ==================== -->
+  <section class="screen screen-game">
+
+    <div class="track-area">
+      <div class="level-badge" id="level-badge">⭐ Level 1</div>
+      <div class="track-road"></div>
+      <div class="track-markers" id="track-markers">
+        <!-- populated by JS -->
+      </div>
+      <div class="animal-walker" id="animal-walker">
+        <div class="animal-char" id="animal-char">
+          <div class="speech-bubble" id="speech-bubble"></div>
+          <span class="animal-emoji" id="animal-emoji">🦆</span>
+          <div class="fart-cloud" id="fart-cloud">💨</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="challenge-area">
+      <p class="challenge-prompt" id="challenge-prompt"><i class="speak-icon">🔈</i>Find the color RED!</p>
+      <div class="answer-grid" id="answer-grid"></div>
+    </div>
+
+  </section>
+
+  <!-- ==================== WIN ==================== -->
+  <section class="screen screen-win">
+    <!-- Video reward (shown when Grok video is ready) -->
+    <div class="win-video-wrap" id="win-video-wrap">
+      <video id="win-video" autoplay loop playsinline muted="false"></video>
+    </div>
+    <!-- Classic win animation (shown when no video) -->
+    <div class="win-destination" id="win-destination">
+      <div class="win-dest-icon"  id="win-dest-icon">🏊</div>
+      <div class="win-animal-icon" id="win-animal-icon">🦆</div>
+      <div class="win-splash"     id="win-splash">💦 💦 💦</div>
+    </div>
+    <h2  class="win-text"      id="win-text">SPLASH! You made it! 🌊</h2>
+    <div class="win-level-msg" id="win-level-msg"></div>
+    <div class="win-buttons"   id="win-buttons">
+      <button class="btn-win btn-replay   js-replay">Play Again! 🔄</button>
+      <button class="btn-win btn-new-dest js-new-dest">New Adventure! 🗺️</button>
+    </div>
+  </section>
+
+  <!-- ==================== REWARD PICK ==================== -->
+  <section class="screen screen-reward">
+    <h2 class="prompt-title" id="reward-title">🎉 You did it! 🎉</h2>
+    <p class="reward-subtitle" id="reward-subtitle">What should 🦆 do?</p>
+    <div class="reward-grid" id="reward-grid">
+      <!-- populated by JS -->
+    </div>
+  </section>
+
+  <!-- ==================== REWARD LOADING ==================== -->
+  <section class="screen screen-reward-loading">
+    <div class="loading-animal-big" id="loading-animal-big">🦆</div>
+    <h2 class="loading-title">Making your video! 🎬</h2>
+    <p class="loading-msg" id="loading-msg">Preparing the fun...</p>
+    <div class="loading-dots"><span>•</span><span>•</span><span>•</span></div>
+    <button class="btn-skip-video js-skip-video">Skip ⏭️</button>
+  </section>
+
+</div><!-- #app -->
+
+<!-- Always-visible mute button (outside #app so it floats over all screens) -->
+<button class="btn-mute js-mute-music" id="btn-mute" aria-label="Toggle music">🔊</button>
+<button class="btn-home js-home" aria-label="Back to home">🏠</button>
+
+<!-- Background music player (hidden) -->
+<audio id="bg-audio" preload="none"></audio>
+
+<script src="config.js"></script>
+<script>
+'use strict';
+
+// =========================================
+// DATA
+// =========================================
+
+const ANIMALS = {
+  duck:     { emoji: '🦆', name: 'Duck'     },
+  elephant: { emoji: '🐘', name: 'Elephant' },
+  monkey:   { emoji: '🐒', name: 'Monkey'   },
+  lion:     { emoji: '🦁', name: 'Lion'     },
+  cat:      { emoji: '🐱', name: 'Cat'      },
+  dog:      { emoji: '🐶', name: 'Dog'      },
+  frog:     { emoji: '🐸', name: 'Frog'     },
+  penguin:  { emoji: '🐧', name: 'Penguin'  },
+  rabbit:   { emoji: '🐰', name: 'Rabbit'   },
+  bear:     { emoji: '🐻', name: 'Bear'     },
+  pig:      { emoji: '🐷', name: 'Pig'      },
+};
+
+const DESTINATIONS = [
+  { id: 'pool',     emoji: '🏊', winText: 'SPLASH! You made it to the pool! 🌊' },
+  { id: 'pizza',    emoji: '🍕', winText: 'YUMMY! Pizza party! 🎉'              },
+  { id: 'rocket',   emoji: '🚀', winText: 'BLAST OFF! To the stars! ⭐'         },
+  { id: 'castle',   emoji: '🏰', winText: 'You found the magic castle! 👑'      },
+  { id: 'icecream', emoji: '🍦', winText: 'ICE CREAM for everyone! 🎊'          },
+  { id: 'rainbow',  emoji: '🌈', winText: 'Wow! A beautiful RAINBOW! 🎨'        },
+  { id: 'treasure', emoji: '💎', winText: 'You found the TREASURE! 💰'          },
+];
+
+// GROK_API_KEY is loaded from config.js (git-ignored) — see config.example.js
+
+// Pool of celebration rewards shown on the reward-pick screen
+const REWARDS = [
+  {
+    id: 'fart', emoji: '💨', label: 'Big Fart!', winText: '💨 LET IT RIP! 🎉',
+    loadMsg: 'Loading up the gas tanks... 💨',
+    prompt: name => `A silly cute cartoon ${name} doing a huge magical fart with colorful gas clouds and bubbles, funny kids animation style, vibrant bright colors, joyful`,
+  },
+  {
+    id: 'splash', emoji: '🌊', label: 'Cannonball!', winText: '🌊 CANNONBALL! 💦',
+    loadMsg: 'Filling up the pool... 🌊',
+    prompt: name => `A cute cartoon ${name} jumping high and doing a huge cannonball into a swimming pool making an enormous splash with water everywhere, kids animation style, bright cheerful colors`,
+  },
+  {
+    id: 'rocket', emoji: '🚀', label: 'To Space!', winText: '🚀 BLAST OFF! ⭐',
+    loadMsg: 'Counting down to launch... 🚀',
+    prompt: name => `A cute cartoon ${name} riding a colorful rocket ship blasting off into outer space surrounded by stars and colorful planets, kids animation style, exciting and joyful`,
+  },
+  {
+    id: 'dance', emoji: '🕺', label: 'Dance Party!', winText: '🕺 DANCE PARTY! 🎉',
+    loadMsg: 'Setting up the disco lights... 🕺',
+    prompt: name => `A cute cartoon ${name} doing a silly funny victory dance with disco lights, confetti and balloons everywhere, kids animation style, colorful and joyful`,
+  },
+  {
+    id: 'rainbow', emoji: '🌈', label: 'Rainbow Slide!', winText: '🌈 WHEEEEE! 🎊',
+    loadMsg: 'Painting the rainbow... 🌈',
+    prompt: name => `A cute cartoon ${name} joyfully sliding down a giant rainbow laughing with delight, magical colorful clouds and sunshine, kids animation style, whimsical and happy`,
+  },
+  {
+    id: 'icecream', emoji: '🍦', label: 'Ice Cream!', winText: '🍦 YUMMY YUMMY! 😋',
+    loadMsg: 'Scooping the ice cream... 🍦',
+    prompt: name => `A cute cartoon ${name} eating a giant towering colorful ice cream cone with many scoops and rainbow sprinkles, happy and delighted, kids animation style, bright and cheerful`,
+  },
+];
+
+const LOADING_MESSAGES = [
+  '🎬 Filming the fun...',
+  '✨ Adding magic sparkles...',
+  '🎨 Painting every pixel...',
+  '🌟 Making it extra special...',
+  '🦄 Finding the unicorns...',
+  '⭐ Almost ready...',
+  '🎪 Setting up the stage...',
+];
+
+// Shape definitions: each has a fixed color for clarity
+const SHAPES = [
+  { id: 'circle',   name: 'Circle',   color: '#E53935',
+    svg: '<circle cx="50" cy="50" r="44"/>' },
+  { id: 'square',   name: 'Square',   color: '#1E88E5',
+    svg: '<rect x="6" y="6" width="88" height="88" rx="10"/>' },
+  { id: 'triangle', name: 'Triangle', color: '#43A047',
+    svg: '<polygon points="50,5 95,92 5,92"/>' },
+  { id: 'star',     name: 'Star',     color: '#FB8C00',
+    svg: '<polygon points="50,5 62,35 95,35 70,57 80,92 50,72 20,92 30,57 5,35 38,35"/>' },
+  { id: 'heart',    name: 'Heart',    color: '#E91E63',
+    svg: '<path d="M50,83 C25,67 5,52 5,33 C5,19 16,8 28,8 C37,8 44,13 50,20 C56,13 63,8 72,8 C84,8 95,19 95,33 C95,52 75,67 50,83Z"/>' },
+  { id: 'diamond',  name: 'Diamond',  color: '#8E24AA',
+    svg: '<polygon points="50,5 95,50 50,95 5,50"/>' },
+];
+
+// Number background colors (cycle through for variety)
+const NUM_BG = ['#FFF9C4','#E1F5FE','#F3E5F5','#E8F5E9','#FCE4EC','#E3F2FD','#FBE9E7','#FFFDE7','#E8EAF6'];
+
+const CHALLENGES = {
+
+  colors: {
+    prompt:  item  => `Find the color ${item.name.toUpperCase()}! 🎨`,
+    items: [
+      { id: 'red',    name: 'Red',    hex: '#E53935' },
+      { id: 'blue',   name: 'Blue',   hex: '#1E88E5' },
+      { id: 'green',  name: 'Green',  hex: '#43A047' },
+      { id: 'yellow', name: 'Yellow', hex: '#FDD835' },
+      { id: 'orange', name: 'Orange', hex: '#FB8C00' },
+      { id: 'purple', name: 'Purple', hex: '#8E24AA' },
+      { id: 'pink',   name: 'Pink',   hex: '#E91E8C' },
+    ],
+    render(item) {
+      return `<span class="color-swatch" style="background:${item.hex}"></span>
+              <span class="option-label">${item.name}</span>`;
+    },
+    style(item) {
+      return `background:${item.hex}25; color:#333; border-color:${item.hex}70;`;
+    },
+  },
+
+  shapes: {
+    prompt: item => `Find the ${item.name}! 🔷`,
+    items:  SHAPES,
+    render(item) {
+      return `<svg class="shape-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"
+                   fill="${item.color}">${item.svg}</svg>
+              <span class="option-label">${item.name}</span>`;
+    },
+    style(_item) {
+      return `background:#fff; color:#444;`;
+    },
+  },
+
+  numbers: {
+    prompt: item => `Find the number ${item.name}! 🔢`,
+    items:  [1,2,3,4,5,6,7,8,9].map(n => ({ id: String(n), name: String(n) })),
+    render(item) {
+      return `<span class="number-display">${item.name}</span>`;
+    },
+    style(_item, idx) {
+      return `background:${NUM_BG[idx % NUM_BG.length]}; color:#333;`;
+    },
+  },
+
+};
+
+const CORRECT_PHRASES = [
+  'BUURP! 🎉', 'WHEEEE! 💨', 'YIPEE! ⭐',
+  'WOO HOO! 🌟', 'AWESOME! 🎊', 'YAY! 🦄',
+  'WAHOO! 🎈', 'NICE! 🏆', 'HA HA! 😂',
+];
+
+const WRONG_PHRASES = [
+  'Oops... 😢', 'Try again! 💪', 'Hmm... 🤔',
+  'Almost! 😅', 'Keep going! 🙂', 'Oh no! 😬',
+];
+
+// =========================================
+// GAME STATE
+// =========================================
+
+const STATES = {
+  WELCOME:        'WELCOME',
+  SELECT_ANIMAL:  'SELECT_ANIMAL',
+  PLAYING:        'PLAYING',
+  CORRECT_ANIM:   'CORRECT_ANIM',
+  WRONG_ANIM:     'WRONG_ANIM',
+  REWARD_PICK:    'REWARD_PICK',
+  REWARD_LOADING: 'REWARD_LOADING',
+  WIN:            'WIN',
+};
+
+const gs = {                   // game state
+  state:           STATES.WELCOME,
+  animal:          null,       // 'duck' | 'elephant' | 'monkey'
+  animalEmoji:     null,
+  position:        0,          // 0 – getTotalSteps()
+  destination:     null,
+  challengeQueue:  [],
+  animLocked:      false,
+  gameCorrect:     0,          // correct answers this game (for difficulty tracking)
+  gameWrong:       0,          // wrong answers this game
+  consecWrong:     0,          // consecutive wrong streak (resets on correct)
+  rewardOptions:   [],         // 3 reward choices shown on REWARD_PICK screen
+  chosenReward:    null,       // reward the kid picked
+  rewardVideoUrl:  null,       // generated / cached video URL (or null → classic win)
+};
+
+// Level → steps required to win (index = level number, 1-based)
+const LEVEL_STEPS = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12];
+const MAX_LEVEL   = LEVEL_STEPS.length - 1;  // 10
+
+function getTotalSteps() { return LEVEL_STEPS[diff.level]; }
+
+// =========================================
+// DIFFICULTY / ADAPTIVE LEVEL
+// =========================================
+
+const diff = loadDiff();   // load from localStorage (or defaults)
+
+function loadDiff() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('kidgame_diff') || '{}');
+    return {
+      level:       Math.min(Math.max(saved.level || 1, 1), MAX_LEVEL),
+      gameHistory: saved.gameHistory || [],   // [{correct, wrong}, ...] last 5 games
+    };
+  } catch { return { level: 1, gameHistory: [] }; }
+}
+
+function saveDiff() {
+  localStorage.setItem('kidgame_diff', JSON.stringify({
+    level:       diff.level,
+    gameHistory: diff.gameHistory,
+  }));
+}
+
+function resetDiff() {
+  diff.level       = 1;
+  diff.gameHistory = [];
+  saveDiff();
+}
+
+// Called after each game win. Returns level change: -1 / 0 / +1
+function adjustDiff(correct, wrong) {
+  // Record this game
+  diff.gameHistory.push({ correct, wrong });
+  if (diff.gameHistory.length > 5) diff.gameHistory.shift();
+
+  // Need at least 1 game to adjust
+  const history = diff.gameHistory;
+  const totalQ  = history.reduce((s, g) => s + g.correct + g.wrong, 0);
+  const totalC  = history.reduce((s, g) => s + g.correct, 0);
+  const acc     = totalQ > 0 ? totalC / totalQ : 1;
+
+  let change = 0;
+  if (history.length >= 2 && acc >= 0.78 && diff.level < MAX_LEVEL) {
+    diff.level++;
+    change = 1;
+  } else if (history.length >= 1 && acc <= 0.42 && diff.level > 1) {
+    diff.level--;
+    change = -1;
+  }
+  saveDiff();
+  return change;
+}
+
+// =========================================
+// UTILITIES
+// =========================================
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// =========================================
+// SOUND  (Web Audio API – no files needed)
+// =========================================
+
+let _actx = null;
+
+function getCtx() {
+  if (!_actx) _actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_actx.state === 'suspended') _actx.resume();
+  return _actx;
+}
+
+// Helper: schedule a single tone
+function tone(ctx, type, freq, startHz, endHz, startT, dur, vol) {
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq || startHz, startT);
+  if (endHz) osc.frequency.exponentialRampToValueAtTime(endHz, startT + dur);
+  gain.gain.setValueAtTime(0.001, startT);
+  gain.gain.linearRampToValueAtTime(vol, startT + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.001, startT + dur);
+  osc.start(startT);
+  osc.stop(startT + dur + 0.05);
+}
+
+// Soft button tap click
+function sndTap() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'sine', 900, null, null, t, 0.055, 0.18);
+}
+
+// Correct: happy C-E-G ascending ding
+function sndCorrect() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  [[523, 0], [659, 0.13], [784, 0.26], [1047, 0.4]].forEach(([f, d]) =>
+    tone(ctx, 'sine', f, null, null, t + d, 0.22, 0.38)
+  );
+}
+
+// Wrong: fart noise using filtered noise burst
+function sndWrong() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  const dur = 0.38 + Math.random() * 0.18;
+  const sr  = ctx.sampleRate;
+  const buf = ctx.createBuffer(1, Math.ceil(sr * dur), sr);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) {
+    const p = i / d.length;
+    // quick attack, slow decay; slight "blubber" by modulating amplitude
+    const env = Math.pow(p < 0.08 ? p / 0.08 : 1 - (p - 0.08) / 0.92, 1.4);
+    const blub = 1 + 0.35 * Math.sin(p * Math.PI * 18); // ~9 wobbles
+    d[i] = (Math.random() * 2 - 1) * env * blub;
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  // Lowpass: starts mid-range, drops to rumble
+  const filt = ctx.createBiquadFilter();
+  filt.type = 'lowpass';
+  filt.frequency.setValueAtTime(520, t);
+  filt.frequency.exponentialRampToValueAtTime(60, t + dur);
+  const gain = ctx.createGain();
+  gain.gain.value = 0.65;
+  src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+  src.start(t); src.stop(t + dur + 0.05);
+}
+
+// Big fart (2nd consecutive wrong) — longer, louder, wobblier
+function sndBigFart() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  const dur = 0.7 + Math.random() * 0.2;
+  const sr  = ctx.sampleRate;
+  const buf = ctx.createBuffer(1, Math.ceil(sr * dur), sr);
+  const d   = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) {
+    const p   = i / d.length;
+    const env = Math.pow(p < 0.06 ? p / 0.06 : 1 - (p - 0.06) / 0.94, 1.2);
+    const blub = 1 + 0.5 * Math.sin(p * Math.PI * 24);
+    d[i] = (Math.random() * 2 - 1) * env * blub;
+  }
+  const src  = ctx.createBufferSource();
+  src.buffer = buf;
+  const filt = ctx.createBiquadFilter();
+  filt.type = 'lowpass';
+  filt.frequency.setValueAtTime(600, t);
+  filt.frequency.exponentialRampToValueAtTime(45, t + dur);
+  const gain = ctx.createGain();
+  gain.gain.value = 0.85;
+  src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+  src.start(t); src.stop(t + dur + 0.05);
+}
+
+// Step forward: short rising whoosh
+function sndStep() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'sine', null, 380, 580, t, 0.18, 0.14);
+}
+
+// Win fanfare: arpeggio then chord
+function sndWin() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  // Ascending arpeggio
+  [[261, 0], [329, 0.16], [392, 0.32], [523, 0.48]].forEach(([f, d]) =>
+    tone(ctx, 'sine', f, null, null, t + d, 0.45, 0.32)
+  );
+  // Held chord
+  [[523, 659, 784, 1047]].flat().forEach(f =>
+    tone(ctx, 'sine', f, null, null, t + 0.75, 1.4, 0.22)
+  );
+}
+
+// Duck: two quick quacks
+function sndDuck() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  [0, 0.38].forEach(d =>
+    tone(ctx, 'sawtooth', null, 920, 560, t + d, 0.2, 0.28)
+  );
+}
+
+// Elephant: low rising trumpet blast
+function sndElephant() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'square', null, 140, 340, t, 0.55, 0.18);
+  tone(ctx, 'square', null, 340, 260, t + 0.52, 0.28, 0.14);
+}
+
+// Monkey: rapid chatter
+function sndMonkey() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  [600, 850, 620, 950, 680, 900].forEach((f, i) =>
+    tone(ctx, 'sine', f, null, null, t + i * 0.1, 0.09, 0.28)
+  );
+}
+
+// Lion: deep sawtooth roar sweeping down
+function sndLion() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'sawtooth', null, 160, 55, t,      0.75, 0.40);
+  tone(ctx, 'square',   null,  80, 35, t + 0.1, 0.65, 0.22);
+}
+
+// Cat: sine meow — up then down
+function sndCat() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'sine', null, 420, 820, t,      0.18, 0.20);
+  tone(ctx, 'sine', null, 820, 360, t + 0.18, 0.30, 0.20);
+}
+
+// Dog: two short square-wave woofs
+function sndDog() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'square', null, 300, 190, t,      0.14, 0.32);
+  tone(ctx, 'square', null, 290, 185, t + 0.28, 0.14, 0.28);
+}
+
+// Frog: classic two-part ribbit
+function sndFrog() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'square', null, 190, 165, t,      0.10, 0.22);
+  tone(ctx, 'square', null, 260, 210, t + 0.13, 0.13, 0.22);
+  tone(ctx, 'square', null, 190, 165, t + 0.29, 0.10, 0.18);
+}
+
+// Penguin: high sawtooth squawk
+function sndPenguin() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'sawtooth', null, 580, 940, t,      0.10, 0.20);
+  tone(ctx, 'sawtooth', null, 780, 480, t + 0.13, 0.18, 0.18);
+}
+
+// Rabbit: two soft high-pitched squeaks
+function sndRabbit() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'sine', null, 880, 660, t,      0.09, 0.13);
+  tone(ctx, 'sine', null, 820, 620, t + 0.20, 0.09, 0.12);
+}
+
+// Bear: low sawtooth growl
+function sndBear() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'sawtooth', null, 130, 55, t,      0.70, 0.38);
+  tone(ctx, 'square',   null,  70, 40, t + 0.12, 0.55, 0.20);
+}
+
+// Pig: nasal oink — up then down
+function sndPig() {
+  const ctx = getCtx(), t = ctx.currentTime;
+  tone(ctx, 'sawtooth', null, 320, 540, t,      0.13, 0.26);
+  tone(ctx, 'sawtooth', null, 500, 290, t + 0.15, 0.18, 0.22);
+}
+
+const ANIMAL_SOUNDS = {
+  duck: sndDuck, elephant: sndElephant, monkey: sndMonkey,
+  lion: sndLion, cat: sndCat, dog: sndDog, frog: sndFrog,
+  penguin: sndPenguin, rabbit: sndRabbit, bear: sndBear, pig: sndPig,
+};
+
+// =========================================
+// TEXT-TO-SPEECH  (Grok TTS + Web Speech fallback)
+// =========================================
+
+let _ttsVoice    = null;   // Web Speech fallback voice
+let _ttsSpeaking = false;
+let _ttsAudio    = null;   // currently playing Grok TTS audio element
+
+// Voice IDs for different contexts (xAI TTS voices: eve, ara, leo, rex, sal)
+const TTS_VOICE = {
+  question: 'eve',   // clear, friendly — for challenge questions
+  cheer:    'leo',   // energetic — for correct answers & win
+  comfort:  'ara',   // warm, gentle — for wrong answers
+  hype:     'rex',   // enthusiastic — for reward pick & countdown
+};
+
+function initTTS() {
+  if (!window.speechSynthesis) return;
+
+  const pickVoice = () => {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return;
+
+    // Prefer clear English voices known to be child-friendly on iOS/macOS/Chrome
+    const preferred = [
+      'Samantha', 'Karen', 'Moira', 'Fiona', 'Tessa',  // Apple
+      'Google US English', 'Google UK English Female',   // Chrome
+      'Microsoft Zira', 'Microsoft Aria',                // Windows
+    ];
+    _ttsVoice =
+      preferred.reduce((found, name) =>
+        found || voices.find(v => v.name.includes(name)), null)
+      || voices.find(v => v.lang.startsWith('en-') && !v.name.toLowerCase().includes('compact'))
+      || voices.find(v => v.lang.startsWith('en'))
+      || null;
+  };
+
+  pickVoice();
+  window.speechSynthesis.addEventListener('voiceschanged', pickVoice);
+}
+
+// Cancel any in-flight TTS audio
+function stopTTS() {
+  if (_ttsAudio) { _ttsAudio.pause(); _ttsAudio = null; }
+  window.speechSynthesis?.cancel();
+  _ttsSpeaking = false;
+  $('challenge-prompt')?.classList.remove('speaking');
+}
+
+// Convert a Blob to a base64 data URL (for localStorage caching)
+function _blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+// Play an audio data URL (base64) and call onEnd when done
+function _playDataUrl(dataUrl, onEnd) {
+  const aud = new Audio(dataUrl);
+  _ttsAudio    = aud;
+  _ttsSpeaking = true;
+  aud.onended = () => { _ttsAudio = null; _ttsSpeaking = false; onEnd?.(); };
+  aud.onerror = () => { _ttsAudio = null; _ttsSpeaking = false; onEnd?.(); };
+  aud.play().catch(() => { _ttsAudio = null; _ttsSpeaking = false; onEnd?.(); });
+}
+
+// Like speakText but caches the audio in localStorage under `tts_cache_{key}`.
+// Use for lines that are always the same (e.g. welcome intro) to avoid regenerating.
+async function speakCached(cacheKey, text, onEnd, voiceId = TTS_VOICE.hype) {
+  stopTTS();
+  const storageKey = `tts_cache_${cacheKey}`;
+  const cached = localStorage.getItem(storageKey);
+  if (cached) { _playDataUrl(cached, onEnd); return; }
+
+  const clean = text.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{27BF}]/gu, '').replace(/!/g, '.').trim();
+  try {
+    const res = await fetch('https://api.x.ai/v1/tts', {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${GROK_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: clean, voice_id: voiceId, language: 'en',
+                             output_format: { codec: 'mp3', sample_rate: 24000 } }),
+    });
+    if (!res.ok) throw new Error(`TTS ${res.status}`);
+    const dataUrl = await _blobToDataUrl(await res.blob());
+    localStorage.setItem(storageKey, dataUrl);
+    _playDataUrl(dataUrl, onEnd);
+  } catch (e) {
+    console.warn('[tts] speakCached failed:', e.message);
+    _speakFallback(clean, onEnd);
+  }
+}
+
+// Speak via Grok TTS; falls back to Web Speech API on error
+// voiceId: one of TTS_VOICE.* ('eve', 'ara', 'leo', 'rex', 'sal')
+// showSpeaker: whether to pulse the 🔈 icon (true for challenge prompts)
+async function speakText(text, onEnd, voiceId = TTS_VOICE.question, showSpeaker = false) {
+  const clean = text
+    .replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{27BF}]/gu, '')  // strip emoji
+    .replace(/!/g, '.')                                           // ! → . (avoid "factorial")
+    .trim();
+  if (!clean) { onEnd?.(); return; }
+
+  stopTTS();  // cancel anything already playing
+
+  try {
+    const res = await fetch('https://api.x.ai/v1/tts', {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${GROK_API_KEY}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({
+        text:     clean,
+        voice_id: voiceId,
+        language: 'en',
+        output_format: { codec: 'mp3', sample_rate: 24000 },
+      }),
+    });
+
+    if (!res.ok) throw new Error(`Grok TTS ${res.status}: ${await res.text().catch(() => '')}`);
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const aud  = new Audio(url);
+    _ttsAudio    = aud;
+    _ttsSpeaking = true;
+    if (showSpeaker) $('challenge-prompt')?.classList.add('speaking');
+
+    aud.onended = () => {
+      URL.revokeObjectURL(url);
+      _ttsAudio    = null;
+      _ttsSpeaking = false;
+      if (showSpeaker) $('challenge-prompt')?.classList.remove('speaking');
+      onEnd?.();
+    };
+    aud.onerror = () => {
+      URL.revokeObjectURL(url);
+      _ttsAudio    = null;
+      _ttsSpeaking = false;
+      if (showSpeaker) $('challenge-prompt')?.classList.remove('speaking');
+      _speakFallback(clean, onEnd, showSpeaker);
+    };
+    aud.play().catch(() => _speakFallback(clean, onEnd, showSpeaker));
+
+  } catch (e) {
+    console.warn('[tts] Grok TTS error, using fallback:', e.message);
+    _speakFallback(clean, onEnd, showSpeaker);
+  }
+}
+
+// Web Speech API fallback (used when Grok TTS is unavailable or offline)
+function _speakFallback(text, onEnd, showSpeaker = false) {
+  if (!window.speechSynthesis) { onEnd?.(); return; }
+  window.speechSynthesis.cancel();
+  setTimeout(() => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.88; u.pitch = 1.1; u.volume = 1.0;
+    if (_ttsVoice) u.voice = _ttsVoice;
+    u.onstart  = () => { _ttsSpeaking = true; if (showSpeaker) $('challenge-prompt')?.classList.add('speaking'); };
+    u.onend = u.onerror = () => {
+      _ttsSpeaking = false;
+      if (showSpeaker) $('challenge-prompt')?.classList.remove('speaking');
+      onEnd?.();
+    };
+    window.speechSynthesis.speak(u);
+  }, 80);
+}
+
+function speakChallenge() {
+  const el = $('challenge-prompt');
+  if (!el) return;
+  const text = el.textContent.replace('🔈', '').trim();
+  speakText(text, null, TTS_VOICE.question, true);
+}
+
+function speakWinText(text) {
+  speakText(text, null, TTS_VOICE.cheer);
+}
+
+// =========================================
+// GROK VIDEO GENERATION
+// =========================================
+
+let _loadingMsgInterval = null;
+
+async function fetchRewardVideo(animal, reward) {
+  const cacheKey = `vidcache_v1_${animal}_${reward.id}`;
+  const cached   = localStorage.getItem(cacheKey);
+  if (cached) { console.log('[video] cache hit'); return cached; }
+
+  const animalName = ANIMALS[animal].name;
+  console.log('[video] generating:', animalName, reward.id);
+
+  // 1. Request video generation
+  const genRes = await fetch('https://api.x.ai/v1/videos/generations', {
+    method:  'POST',
+    headers: {
+      'Authorization': `Bearer ${GROK_API_KEY}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      model:      'grok-imagine-video',
+      prompt:     reward.prompt(animalName),
+      duration:   6,
+      resolution: '480p',
+    }),
+  });
+
+  const genText = await genRes.text();
+  console.log('[video] generation response', genRes.status, genText);
+  if (!genRes.ok) throw new Error(`Video API ${genRes.status}: ${genText}`);
+
+  const genData = JSON.parse(genText);
+  const reqId   = genData.request_id ?? genData.id;
+  if (!reqId) throw new Error(`No request_id in response: ${genText}`);
+
+  // 2. Poll GET /v1/videos/{request_id} until done (max 5 min, every 5 s)
+  for (let i = 0; i < 60; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+
+    const pollRes = await fetch(`https://api.x.ai/v1/videos/${reqId}`, {
+      headers: { 'Authorization': `Bearer ${GROK_API_KEY}` },
+    });
+    if (!pollRes.ok) { console.log('[video] poll error', pollRes.status); continue; }
+
+    const data = await pollRes.json();
+    console.log('[video] poll', i + 1, 'status:', data.status, 'progress:', data.progress ?? '–');
+
+    if (data.status === 'done' || data.status === 'completed' || data.status === 'succeeded') {
+      const url = data.video?.url ?? data.url ?? data.videos?.[0]?.url ?? null;
+      if (url) {
+        console.log('[video] done, URL:', url);
+        localStorage.setItem(cacheKey, url);
+        return url;
+      }
+      console.warn('[video] done but no URL found in response:', JSON.stringify(data));
+      throw new Error('Video done but no URL in response');
+    }
+    if (data.status === 'failed' || data.status === 'error') {
+      throw new Error(`Video generation failed: ${JSON.stringify(data)}`);
+    }
+  }
+  throw new Error('Video generation timed out after 5 minutes');
+}
+
+// =========================================
+// BACKGROUND MUSIC  (HTML5 Audio, local MP3s)
+// =========================================
+
+const BG_TRACKS = [
+  'music/little-bells.mp3',        // calm, classical, delicate
+  'music/cristales.mp3',           // crystalline, serene
+  'music/valley-sunset.mp3',       // gentle, peaceful
+  'music/spirit-in-the-woods.mp3', // inspiring, magical
+  'music/serene-view.mp3',         // calm, soothing
+  'music/possible-dreams.mp3',     // inspiring, classical
+];
+
+let _bgMuted   = localStorage.getItem('kidgame_muted') === '1';
+let _bgStarted = false;
+let _bgOrder   = [];   // shuffled play order
+let _bgIdx     = 0;
+
+function _nextTrack() {
+  const audio = $('bg-audio');
+  if (_bgMuted) return;
+  _bgIdx = (_bgIdx + 1) % _bgOrder.length;
+  if (_bgIdx === 0) _bgOrder = shuffle([...BG_TRACKS]);  // reshuffle when we loop
+  audio.src = _bgOrder[_bgIdx];
+  audio.play().catch(() => {});
+}
+
+function startBgMusic() {
+  if (_bgStarted || _bgMuted) return;
+  _bgStarted = true;
+  _bgOrder   = shuffle([...BG_TRACKS]);
+  _bgIdx     = 0;
+  const audio = $('bg-audio');
+  audio.volume = 0.15;
+  audio.src    = _bgOrder[0];
+  audio.addEventListener('ended', _nextTrack);
+  audio.play().catch(() => {});
+}
+
+function toggleMusic() {
+  _bgMuted = !_bgMuted;
+  localStorage.setItem('kidgame_muted', _bgMuted ? '1' : '0');
+  const btn   = $('btn-mute');
+  const audio = $('bg-audio');
+  if (_bgMuted) {
+    btn.textContent = '🔇';
+    btn.classList.add('muted');
+    audio.pause();
+  } else {
+    btn.textContent = '🔊';
+    btn.classList.remove('muted');
+    if (_bgStarted) audio.play().catch(() => {});
+    else            startBgMusic();
+  }
+}
+
+function initMuteBtn() {
+  if (_bgMuted) {
+    $('btn-mute').textContent = '🔇';
+    $('btn-mute').classList.add('muted');
+  }
+}
+
+// =========================================
+// CHALLENGE QUEUE
+// =========================================
+
+function buildQueue() {
+  const queue = [];
+  Object.values(CHALLENGES).forEach(cat => {
+    shuffle(cat.items).forEach(correct => {
+      const wrongs = shuffle(cat.items.filter(i => i.id !== correct.id)).slice(0, 2);
+      queue.push({ cat, correct, distractors: wrongs });
+    });
+  });
+  return shuffle(queue);
+}
+
+// =========================================
+// DOM HELPERS
+// =========================================
+
+const $ = id => document.getElementById(id);
+
+// =========================================
+// RENDERING
+// =========================================
+
+function renderTrack() {
+  const steps   = getTotalSteps();
+  const markers = $('track-markers');
+  let html = '';
+  for (let i = 0; i < steps; i++) {
+    const done = i < gs.position ? ' done' : '';
+    html += `<div class="track-dot${done}"></div>`;
+  }
+  html += `<div class="track-dest-icon">${gs.destination.emoji}</div>`;
+  markers.innerHTML = html;
+
+  $('level-badge').textContent = `⭐ Level ${diff.level}`;
+}
+
+function positionAnimal(step, animated) {
+  const walker = $('animal-walker');
+  const pct    = 5 + (step / getTotalSteps()) * 80; // 5% → 85%
+
+  if (!animated) {
+    walker.style.transition = 'none';
+    walker.style.setProperty('--animal-x', `${pct}%`);
+    void walker.offsetWidth;   // flush reflow to apply instantly
+    walker.style.transition = '';
+  } else {
+    walker.style.setProperty('--animal-x', `${pct}%`);
+  }
+
+  // Update dot "done" states
+  document.querySelectorAll('.track-dot').forEach((dot, i) => {
+    const wasDone = dot.classList.contains('done');
+    const isDone  = i < step;
+    if (!wasDone && isDone) {
+      // Re-trigger animation for newly completed dots
+      dot.classList.remove('done');
+      void dot.offsetWidth;
+      dot.classList.add('done');
+    } else {
+      dot.classList.toggle('done', isDone);
+    }
+  });
+}
+
+// =========================================
+// IDLE RE-PROMPT (nudge kid after silence)
+// =========================================
+
+let _idleTimer   = null;
+let _idleCount   = 0;
+let _activeChallenge = null;   // current { cat, correct } — set by loadChallenge
+
+// Tier 1: gentle nudge after 22 s
+const IDLE_TIER1 = [
+  c => `Hey buddy! Are you still there? Where is the ${c.correct.name}?`,
+  c => `Hmm, I'm still waiting! Which one is the ${c.correct.name}? Have a look!`,
+  c => `Take your time! Can you spot the ${c.correct.name} somewhere up there?`,
+  c => `Hey! Come on! We're looking for the ${c.correct.name}! Can you see it?`,
+  c => `Psst! Look carefully! Which one do you think is the ${c.correct.name}?`,
+];
+
+// Tier 2: warmer encouragement after 40 s total
+const IDLE_TIER2 = [
+  c => `Don't give up! I know you can find the ${c.correct.name}! It's right there!`,
+  c => `You can do it! Look really carefully now... where is the ${c.correct.name}?`,
+  c => `Ooh, this one is tricky! But I believe in you! Find the ${c.correct.name}!`,
+  c => `Hey, let's look together! The ${c.correct.name}… can you point to it?`,
+];
+
+function startIdleTimer() {
+  clearIdleTimer();
+  _idleCount = 0;
+  _idleTimer = setTimeout(_onIdle, 22000);
+}
+
+function clearIdleTimer() {
+  if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; }
+}
+
+function _onIdle() {
+  if (!_activeChallenge || gs.state !== STATES.PLAYING) return;
+  _idleCount++;
+  const pool = _idleCount === 1 ? IDLE_TIER1 : IDLE_TIER2;
+  speakText(pick(pool)(_activeChallenge), null, TTS_VOICE.question, true);
+  if (_idleCount < 2) _idleTimer = setTimeout(_onIdle, 18000);
+  // After 2 nudges we stop — kid may have wandered off
+}
+
+function loadChallenge() {
+  if (gs.challengeQueue.length === 0) {
+    gs.challengeQueue = buildQueue();
+  }
+  const ch     = gs.challengeQueue.pop();
+  _activeChallenge = ch;   // store for idle re-prompts
+  const promptText = ch.cat.prompt(ch.correct);
+
+  // Set prompt text while preserving the speaker icon
+  const promptEl = $('challenge-prompt');
+  promptEl.innerHTML = `<i class="speak-icon">🔈</i>${promptText}`;
+
+  // Build answer buttons first (hidden until question finishes)
+  const options = shuffle([ch.correct, ...ch.distractors]);
+  const grid    = $('answer-grid');
+  grid.innerHTML = options.map((opt, idx) => `
+    <button class="answer-btn"
+            data-correct="${opt.id === ch.correct.id}"
+            style="${ch.cat.style(opt, idx)}">
+      ${ch.cat.render(opt)}
+    </button>
+  `).join('');
+  grid.classList.remove('ready');
+  grid.classList.add('waiting');
+
+  // Auto-read question; reveal answers only when TTS finishes
+  const spokenText = promptText
+    .replace('Find the color', 'Hey! Can you find the color')
+    .replace('Find the', 'Can you spot the')
+    .replace('Find number', 'Which one is the number')
+    .replace(/[!]$/, '?');
+
+  speakText(spokenText, () => {
+    grid.classList.remove('waiting');
+    grid.classList.add('ready');
+    startIdleTimer();   // idle countdown starts only after question has been read
+  }, TTS_VOICE.question, true);
+}
+
+// =========================================
+// ANIMATIONS
+// =========================================
+
+const CHEER_LINES = [
+  'Amazing! You got it!', 'Yes! That\'s right!', 'Fantastic!',
+  'Brilliant! Well done!', 'Woohoo! Correct!', 'Super! Keep going!',
+  'Great job! You\'re so smart!', 'Nailed it!',
+];
+const COMFORT_LINES = [
+  'Oops! That\'s okay, try again!', 'Not quite! Give it another go!',
+  'Almost! Keep trying!', 'Hmm, let\'s try again!', 'Don\'t give up!',
+];
+
+function playCorrect(onDone) {
+  sndCorrect();
+
+  const emojiEl = $('animal-emoji');
+  const bubble  = $('speech-bubble');
+  const fart    = $('fart-cloud');
+
+  bubble.textContent = pick(CORRECT_PHRASES);
+  bubble.classList.add('visible');
+
+  // Re-trigger backflip (force reflow between remove/add)
+  emojiEl.classList.remove('anim-backflip');
+  void emojiEl.offsetWidth;
+  emojiEl.classList.add('anim-backflip');
+
+  // Re-trigger fart
+  fart.classList.remove('active');
+  void fart.offsetWidth;
+  fart.classList.add('active');
+
+  const handler = () => {
+    emojiEl.removeEventListener('animationend', handler);
+    emojiEl.classList.remove('anim-backflip');
+    bubble.classList.remove('visible');
+    fart.classList.remove('active');
+    onDone();
+  };
+  emojiEl.addEventListener('animationend', handler);
+}
+
+const BIG_WRONG_PHRASES = [
+  'PFFFFT! 💩', 'OH NO! 💩', 'WHOOPS! 💩', 'BLERGH! 💩',
+];
+
+function playWrong(isBig, onDone) {
+  isBig ? sndBigFart() : sndWrong();
+
+  const charEl = $('animal-char');
+  const bubble = $('speech-bubble');
+  const fart   = $('fart-cloud');
+
+  bubble.textContent = isBig ? pick(BIG_WRONG_PHRASES) : pick(WRONG_PHRASES);
+  bubble.classList.add('visible');
+
+  // Show poop emoji on big fart, regular cloud otherwise
+  if (isBig) {
+    fart.textContent = '💩';
+    fart.classList.remove('active');
+    void fart.offsetWidth;
+    fart.classList.add('active');
+  }
+
+  charEl.classList.remove('anim-shake');
+  void charEl.offsetWidth;
+  charEl.classList.add('anim-shake');
+
+  const handler = () => {
+    charEl.removeEventListener('animationend', handler);
+    charEl.classList.remove('anim-shake');
+    fart.textContent = '💨';   // reset back to default
+    fart.classList.remove('active');
+    setTimeout(() => {
+      bubble.classList.remove('visible');
+      onDone();
+    }, 350);
+  };
+  charEl.addEventListener('animationend', handler);
+}
+
+function spawnStars() {
+  const emojis = ['⭐','🌟','✨','🎊','🎉','💫','🌈','🎈'];
+  for (let i = 0; i < 10; i++) {
+    const el    = document.createElement('div');
+    el.className = 'star-burst';
+    el.textContent = pick(emojis);
+    // Random origin spread across the screen
+    const ox = 20 + Math.random() * 60;  // % across screen
+    const oy = 20 + Math.random() * 50;
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = 100 + Math.random() * 180;
+    el.style.left = `${ox}vw`;
+    el.style.top  = `${oy}vh`;
+    el.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+    el.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+    el.style.animationDelay = `${Math.random() * 0.3}s`;
+    el.style.fontSize = `${20 + Math.random() * 18}px`;
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+}
+
+function playWin() {
+  const videoWrap = $('win-video-wrap');
+  const videoEl   = $('win-video');
+  const destArea  = $('win-destination');
+  const animalEl  = $('win-animal-icon');
+  const splashEl  = $('win-splash');
+  const textEl    = $('win-text');
+  const lvlMsgEl  = $('win-level-msg');
+  const btnsEl    = $('win-buttons');
+  const destEl    = $('win-dest-icon');
+
+  // Adjust difficulty and build level message
+  const change = adjustDiff(gs.gameCorrect, gs.gameWrong);
+  let levelMsg = '';
+  if (change > 0)      levelMsg = `Level UP! ⬆️  Now Level ${diff.level}!`;
+  else if (change < 0) levelMsg = `Let's try Level ${diff.level} — you've got this! 💪`;
+  else                 levelMsg = `Level ${diff.level} — keep it up! ⭐`;
+
+  lvlMsgEl.textContent = levelMsg;
+  destEl.textContent   = gs.destination.emoji;
+  animalEl.textContent = gs.animalEmoji;
+
+  // Reset UI
+  textEl.classList.remove('visible');
+  lvlMsgEl.classList.remove('visible');
+  btnsEl.classList.remove('visible');
+  splashEl.classList.remove('active');
+  animalEl.classList.remove('anim-jump');
+  void animalEl.offsetWidth;
+
+  if (gs.rewardVideoUrl) {
+    // ── VIDEO WIN ──────────────────────────────────────────────────────
+    const winText = gs.chosenReward?.winText ?? gs.destination.winText;
+    textEl.textContent = winText;
+
+    destArea.style.display = 'none';
+    videoWrap.classList.add('visible');
+
+    // If cached URL is stale, fall back silently to classic win
+    videoEl.onerror = () => {
+      if (gs.chosenReward) localStorage.removeItem(`vidcache_v1_${gs.animal}_${gs.chosenReward.id}`);
+      videoWrap.classList.remove('visible');
+      destArea.style.removeProperty('display');
+      animalEl.classList.remove('anim-jump');
+      void animalEl.offsetWidth;
+      animalEl.classList.add('anim-jump');
+      setTimeout(() => { void splashEl.offsetWidth; splashEl.classList.add('active'); }, 560);
+    };
+
+    videoEl.src = gs.rewardVideoUrl;
+    videoEl.play().catch(() => {});
+
+    sndWin();
+    spawnStars();
+
+    setTimeout(() => { textEl.classList.add('visible'); speakWinText(winText); }, 600);
+    setTimeout(() => lvlMsgEl.classList.add('visible'), 1000);
+    setTimeout(() => btnsEl.classList.add('visible'),   1500);
+
+  } else {
+    // ── CLASSIC WIN ────────────────────────────────────────────────────
+    const winText = gs.destination.winText;
+    textEl.textContent = winText;
+
+    destArea.style.removeProperty('display');
+    videoWrap.classList.remove('visible');
+    videoEl.src = '';
+
+    sndWin();
+    animalEl.classList.add('anim-jump');
+
+    setTimeout(() => {
+      splashEl.classList.remove('active');
+      void splashEl.offsetWidth;
+      splashEl.classList.add('active');
+      spawnStars();
+    }, 560);
+
+    setTimeout(() => { textEl.classList.add('visible'); speakWinText(winText); }, 850);
+    setTimeout(() => lvlMsgEl.classList.add('visible'), 1100);
+    setTimeout(() => btnsEl.classList.add('visible'),   1600);
+  }
+}
+
+// =========================================
+// STATE MACHINE
+// =========================================
+
+function go(newState) {
+  gs.state = newState;
+  $('app').dataset.state = newState;
+
+  switch (newState) {
+
+    case STATES.SELECT_ANIMAL:
+      gs.position       = 0;
+      gs.gameCorrect    = 0;
+      gs.gameWrong      = 0;
+      gs.consecWrong    = 0;
+      gs.rewardVideoUrl = null;
+      gs.chosenReward   = null;
+      break;
+
+    case STATES.PLAYING:
+      positionAnimal(gs.position, false);
+      loadChallenge();
+      break;
+
+    case STATES.CORRECT_ANIM: {
+      clearIdleTimer();
+      gs.animLocked  = true;
+      gs.gameCorrect++;
+      gs.consecWrong = 0;
+
+      // Gate on BOTH cheer voice AND backflip animation finishing
+      let _cvDone = false, _caDone = false;
+      const _onCorrectDone = () => {
+        if (!_cvDone || !_caDone) return;
+        gs.position = Math.min(gs.position + 1, getTotalSteps());
+        if (gs.position >= getTotalSteps()) {
+          gs.animLocked = false;
+          go(STATES.REWARD_PICK);
+        } else {
+          sndStep();
+          positionAnimal(gs.position, true);
+          setTimeout(() => { gs.animLocked = false; go(STATES.PLAYING); }, 500);
+        }
+      };
+      speakText(pick(CHEER_LINES), () => { _cvDone = true; _onCorrectDone(); }, TTS_VOICE.cheer);
+      playCorrect(() => { _caDone = true; _onCorrectDone(); });
+      break;
+    }
+
+    case STATES.WRONG_ANIM: {
+      clearIdleTimer();
+      gs.animLocked = true;
+      gs.gameWrong++;
+      gs.consecWrong++;
+      const isSecondWrong = gs.consecWrong >= 2;
+      if (isSecondWrong) gs.consecWrong = 0;
+
+      // Gate on BOTH comfort voice AND shake animation finishing
+      let _wvDone = false, _waDone = false;
+      const _onWrongDone = () => {
+        if (!_wvDone || !_waDone) return;
+        if (isSecondWrong) {
+          gs.position = Math.max(gs.position - 1, 0);
+          positionAnimal(gs.position, true);
+        }
+        setTimeout(() => { gs.animLocked = false; go(STATES.PLAYING); }, 500);
+      };
+      const comfortLine = isSecondWrong
+        ? 'Oh no, two in a row. Let\'s move back and try again.'
+        : pick(COMFORT_LINES);
+      speakText(comfortLine, () => { _wvDone = true; _onWrongDone(); }, TTS_VOICE.comfort);
+      playWrong(isSecondWrong, () => { _waDone = true; _onWrongDone(); });
+      break;
+    }
+
+    case STATES.REWARD_PICK: {
+      // Pick 3 random rewards
+      const options = shuffle([...REWARDS]).slice(0, 3);
+      gs.rewardOptions  = options;
+      gs.rewardVideoUrl = null;
+      gs.chosenReward   = null;
+
+      $('reward-title').textContent    = `You did it! 🎉`;
+      $('reward-subtitle').textContent = `What should ${gs.animalEmoji} do to celebrate?`;
+
+      $('reward-grid').innerHTML = options.map((r, i) => `
+        <button class="reward-card" data-reward-idx="${i}">
+          <span class="reward-card-emoji">${r.emoji}</span>
+          <span class="reward-card-label">${r.label}</span>
+        </button>
+      `).join('');
+
+      sndWin();
+      spawnStars();
+      speakText(
+        `WOW! You did it! Amazing job! Now pick what ${ANIMALS[gs.animal].name} should do to celebrate!`,
+        null, TTS_VOICE.hype
+      );
+      break;
+    }
+
+    case STATES.REWARD_LOADING: {
+      $('loading-animal-big').textContent = gs.animalEmoji;
+
+      // Show reward-specific first message, then cycle
+      const firstMsg = gs.chosenReward?.loadMsg ?? 'Preparing the fun...';
+      let msgIdx = 0;
+      const msgEl = $('loading-msg');
+      msgEl.textContent = firstMsg;
+
+      if (_loadingMsgInterval) clearInterval(_loadingMsgInterval);
+      _loadingMsgInterval = setInterval(() => {
+        msgEl.style.opacity = '0';
+        setTimeout(() => {
+          msgEl.textContent  = LOADING_MESSAGES[msgIdx % LOADING_MESSAGES.length];
+          msgEl.style.opacity = '1';
+          msgIdx++;
+        }, 300);
+      }, 3800);
+
+      fetchRewardVideo(gs.animal, gs.chosenReward)
+        .then(url => {
+          clearInterval(_loadingMsgInterval);
+          _loadingMsgInterval = null;
+          gs.rewardVideoUrl = url;
+          go(STATES.WIN);
+        })
+        .catch(err => {
+          console.warn('Grok video error:', err);
+          clearInterval(_loadingMsgInterval);
+          _loadingMsgInterval = null;
+          gs.rewardVideoUrl = null;
+          go(STATES.WIN);   // fallback: classic win animation
+        });
+      break;
+    }
+
+    case STATES.WIN:
+      playWin();
+      break;
+  }
+}
+
+// =========================================
+// EVENT WIRING
+// =========================================
+
+function initGame() {
+
+  // Welcome → intro voice → Select animal
+  document.querySelector('.js-start').addEventListener('click', () => {
+    sndTap();
+    startBgMusic();
+
+    // Cached intro — generated once, replayed from localStorage after that
+    speakCached(
+      'welcome_intro',
+      'Welcome to Animal Adventure. Pick your hero and let\'s go on an adventure together.',
+      () => go(STATES.SELECT_ANIMAL),
+      TTS_VOICE.hype
+    );
+  });
+
+  // Pick animal
+  document.querySelectorAll('.js-pick-animal').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const a         = e.currentTarget.dataset.animal;
+      gs.animal       = a;
+      gs.animalEmoji  = ANIMALS[a].emoji;
+      $('animal-emoji').textContent = gs.animalEmoji;
+
+      gs.destination     = pick(DESTINATIONS);
+      gs.challengeQueue  = buildQueue();
+      gs.position        = 0;
+
+      // Play the animal's unique sound
+      ANIMAL_SOUNDS[a]?.();
+
+      renderTrack();
+
+      // Short voice hype before first question
+      const animalName = ANIMALS[a].name;
+      const dest       = gs.destination;
+      const pickLines  = [
+        `${animalName}! Great choice! Let's help ${animalName} get to the ${dest.emoji}!`,
+        `Woohoo! ${animalName} is ready! Answer the questions and ${animalName} will walk all the way there!`,
+        `${animalName}! Awesome! Let's go! Answer right and ${animalName} takes a step closer!`,
+      ];
+      speakText(pick(pickLines), () => go(STATES.PLAYING), TTS_VOICE.hype);
+    });
+  });
+
+  // Answer buttons (event delegation)
+  $('answer-grid').addEventListener('click', e => {
+    if (gs.animLocked) return;
+    const btn = e.target.closest('.answer-btn');
+    if (!btn) return;
+    sndTap();
+    go(btn.dataset.correct === 'true' ? STATES.CORRECT_ANIM : STATES.WRONG_ANIM);
+  });
+
+  // Reward pick: tap a reward card
+  $('reward-grid').addEventListener('click', e => {
+    const card = e.target.closest('.reward-card');
+    if (!card) return;
+    sndTap();
+    const idx = parseInt(card.dataset.rewardIdx, 10);
+    gs.chosenReward = gs.rewardOptions[idx];
+    go(STATES.REWARD_LOADING);
+  });
+
+  // Reward loading: skip (fall back to classic win)
+  document.querySelector('.js-skip-video').addEventListener('click', () => {
+    sndTap();
+    if (_loadingMsgInterval) { clearInterval(_loadingMsgInterval); _loadingMsgInterval = null; }
+    gs.rewardVideoUrl = null;
+    go(STATES.WIN);
+  });
+
+  // Win: play again (full reset)
+  document.querySelector('.js-replay').addEventListener('click', () => {
+    sndTap();
+    $('win-video').src = '';
+    $('win-video-wrap').classList.remove('visible');
+    go(STATES.SELECT_ANIMAL);
+  });
+
+  // Win: new destination (same animal, reset position + game counters)
+  document.querySelector('.js-new-dest').addEventListener('click', () => {
+    sndTap();
+    $('win-video').src = '';
+    $('win-video-wrap').classList.remove('visible');
+    gs.position       = 0;
+    gs.gameCorrect    = 0;
+    gs.gameWrong      = 0;
+    gs.consecWrong    = 0;
+    gs.rewardVideoUrl = null;
+    gs.chosenReward   = null;
+    gs.destination    = pick(DESTINATIONS);
+    gs.challengeQueue = buildQueue();
+    renderTrack();
+    go(STATES.PLAYING);
+  });
+
+  // Reset difficulty level (parent-facing button on welcome screen)
+  document.querySelector('.js-reset-level').addEventListener('click', () => {
+    sndTap();
+    resetDiff();
+    $('level-badge').textContent = '⭐ Level 1';
+  });
+
+  // Mute toggle
+  $('btn-mute').addEventListener('click', toggleMusic);
+
+  // Home button — return to welcome screen from anywhere
+  document.querySelector('.js-home').addEventListener('click', () => {
+    sndTap();
+    clearIdleTimer();
+    if (_loadingMsgInterval) { clearInterval(_loadingMsgInterval); _loadingMsgInterval = null; }
+    stopTTS();
+    $('win-video').src = '';
+    $('win-video-wrap').classList.remove('visible');
+    go(STATES.WELCOME);
+  });
+
+  // Tap challenge prompt to repeat the question aloud
+  $('challenge-prompt').addEventListener('click', () => {
+    if (gs.state === 'PLAYING') speakChallenge();
+  });
+}
+
+// =========================================
+// BOOT
+// =========================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  initMuteBtn();
+  initTTS();
+  initGame();
+});
+</script>
+</body>
+</html>

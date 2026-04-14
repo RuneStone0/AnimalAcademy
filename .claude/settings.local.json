@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3456/)",
+      "WebSearch",
+      "WebFetch(domain:www.fesliyanstudios.com)",
+      "WebFetch(domain:pixabay.com)",
+      "WebFetch(domain:mixkit.co)",
+      "Bash(mkdir -p \"C:/Users/RuneKristensen/Documents/Claude/Projects/KidGame/music\")",
+      "Bash(curl -L -o \"playground-fun.mp3\"  \"https://assets.mixkit.co/music/12/12.mp3\"  -w \"playground-fun: %{http_code} %{size_download} bytes\\\\n\" --silent)",
+      "Bash(curl -L -o \"kidding-around.mp3\"  \"https://assets.mixkit.co/music/9/9.mp3\"   -w \"kidding-around: %{http_code} %{size_download} bytes\\\\n\" --silent)",
+      "Bash(curl -L -o \"keep-smiling.mp3\"    \"https://assets.mixkit.co/music/15/15.mp3\"  -w \"keep-smiling: %{http_code} %{size_download} bytes\\\\n\" --silent)",
+      "Bash(curl -L -o \"just-kidding.mp3\"    \"https://assets.mixkit.co/music/11/11.mp3\"  -w \"just-kidding: %{http_code} %{size_download} bytes\\\\n\" --silent)",
+      "WebFetch(domain:freemusicarchive.org)",
+      "Bash(curl -L -o \"little-bells.mp3\"       \"https://assets.mixkit.co/music/506/506.mp3\"  -w \"little-bells: %{http_code} %{size_download}b\\\\n\" --silent)",
+      "Bash(curl -L -o \"cristales.mp3\"          \"https://assets.mixkit.co/music/577/577.mp3\"  -w \"cristales: %{http_code} %{size_download}b\\\\n\" --silent)",
+      "Bash(curl -L -o \"valley-sunset.mp3\"       \"https://assets.mixkit.co/music/127/127.mp3\"  -w \"valley-sunset: %{http_code} %{size_download}b\\\\n\" --silent)",
+      "Bash(curl -L -o \"spirit-in-the-woods.mp3\" \"https://assets.mixkit.co/music/139/139.mp3\"  -w \"spirit-in-woods: %{http_code} %{size_download}b\\\\n\" --silent)",
+      "Bash(curl -L -o \"serene-view.mp3\"         \"https://assets.mixkit.co/music/443/443.mp3\"  -w \"serene-view: %{http_code} %{size_download}b\\\\n\" --silent)",
+      "WebFetch(domain:docs.x.ai)",
+      "Bash(mkdir -p screenshots)",
+      "Bash(python -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(python -c \"import playwright; print\\('playwright ok'\\)\")",
+      "Bash(pip install:*)",
+      "Bash(python -m playwright install chromium)"
+    ]
+  }
+}
