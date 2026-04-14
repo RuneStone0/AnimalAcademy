@@ -509,6 +509,37 @@
       transition: opacity 0.35s;
     }
 
+    /* Shimmer pulse on answer buttons while TTS is loading */
+    @keyframes btn-shimmer {
+      0%, 100% { opacity: 0.35; transform: scale(0.97); }
+      50%       { opacity: 0.65; transform: scale(1.00); }
+    }
+    .answer-grid.waiting .answer-btn:nth-child(1) { animation: btn-shimmer 1.3s ease-in-out infinite 0.0s; }
+    .answer-grid.waiting .answer-btn:nth-child(2) { animation: btn-shimmer 1.3s ease-in-out infinite 0.2s; }
+    .answer-grid.waiting .answer-btn:nth-child(3) { animation: btn-shimmer 1.3s ease-in-out infinite 0.4s; }
+
+    /* Bouncing dots on challenge prompt while TTS fetch is in-flight */
+    @keyframes dot-bounce {
+      0%, 80%, 100% { transform: translateY(0);    opacity: 0.45; }
+      40%            { transform: translateY(-6px); opacity: 1.00; }
+    }
+    .tts-dots {
+      display: none;
+      gap: 5px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .tts-dots span {
+      display: inline-block;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: dot-bounce 1.1s ease-in-out infinite;
+    }
+    .tts-dots span:nth-child(2) { animation-delay: 0.18s; }
+    .tts-dots span:nth-child(3) { animation-delay: 0.36s; }
+    #challenge-prompt.loading .tts-dots { display: inline-flex; }
+
     .color-swatch {
       width: 68px; height: 68px;
       border-radius: 50%;
@@ -1294,6 +1325,26 @@ function getCtx() {
   return _actx;
 }
 
+// iOS Safari blocks audio until the user has interacted with the page.
+// On the first tap/click, play a silent 1-frame buffer through Web Audio AND
+// prime a silent HTML5 Audio element so subsequent new Audio().play() calls
+// are allowed even inside async callbacks (fetch → blob → Audio).
+let _audioUnlocked = false;
+function _unlockAudio() {
+  if (_audioUnlocked) return;
+  _audioUnlocked = true;
+  try {
+    const ctx = getCtx();
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch (e) {}
+}
+document.addEventListener('touchstart', _unlockAudio, { once: true, passive: true });
+document.addEventListener('click',      _unlockAudio, { once: true });
+
 // Helper: schedule a single tone
 function tone(ctx, type, freq, startHz, endHz, startT, dur, vol) {
   const osc  = ctx.createOscillator();
@@ -1588,8 +1639,19 @@ async function speakText(text, onEnd, voiceId = TTS_VOICE.question, showSpeaker 
 
   stopTTS();  // cancel anything already playing
 
+  // Show loading dots while fetch is in-flight
+  if (showSpeaker) {
+    $('challenge-prompt')?.classList.add('loading');
+    $('challenge-prompt')?.classList.remove('speaking');
+  }
+
   try {
+    // Abort the fetch if it takes more than 10 s (e.g. slow mobile network)
+    const controller   = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), 10000);
+
     const res = await fetch('https://api.x.ai/v1/tts', {
+      signal: controller.signal,
       method:  'POST',
       headers: {
         'Authorization': `Bearer ${GROK_API_KEY}`,
@@ -1602,6 +1664,7 @@ async function speakText(text, onEnd, voiceId = TTS_VOICE.question, showSpeaker 
         output_format: { codec: 'mp3', sample_rate: 24000 },
       }),
     });
+    clearTimeout(fetchTimeout);
 
     if (!res.ok) throw new Error(`Grok TTS ${res.status}: ${await res.text().catch(() => '')}`);
 
@@ -1610,7 +1673,11 @@ async function speakText(text, onEnd, voiceId = TTS_VOICE.question, showSpeaker 
     const aud  = new Audio(url);
     _ttsAudio    = aud;
     _ttsSpeaking = true;
-    if (showSpeaker) $('challenge-prompt')?.classList.add('speaking');
+    // Fetch done — switch from loading dots to speaking pulse
+    if (showSpeaker) {
+      $('challenge-prompt')?.classList.remove('loading');
+      $('challenge-prompt')?.classList.add('speaking');
+    }
 
     aud.onended = () => {
       URL.revokeObjectURL(url);
@@ -1623,31 +1690,47 @@ async function speakText(text, onEnd, voiceId = TTS_VOICE.question, showSpeaker 
       URL.revokeObjectURL(url);
       _ttsAudio    = null;
       _ttsSpeaking = false;
-      if (showSpeaker) $('challenge-prompt')?.classList.remove('speaking');
+      if (showSpeaker) $('challenge-prompt')?.classList.remove('loading', 'speaking');
       _speakFallback(clean, onEnd, showSpeaker);
     };
-    aud.play().catch(() => _speakFallback(clean, onEnd, showSpeaker));
+    aud.play().catch(() => {
+      if (showSpeaker) $('challenge-prompt')?.classList.remove('loading', 'speaking');
+      _speakFallback(clean, onEnd, showSpeaker);
+    });
 
   } catch (e) {
     console.warn('[tts] Grok TTS error, using fallback:', e.message);
+    if (showSpeaker) $('challenge-prompt')?.classList.remove('loading', 'speaking');
     _speakFallback(clean, onEnd, showSpeaker);
   }
 }
 
 // Web Speech API fallback (used when Grok TTS is unavailable or offline)
+// Includes a watchdog timer for iOS Safari, which sometimes never fires onend.
 function _speakFallback(text, onEnd, showSpeaker = false) {
+  if (showSpeaker) $('challenge-prompt')?.classList.remove('loading');
   if (!window.speechSynthesis) { onEnd?.(); return; }
   window.speechSynthesis.cancel();
   setTimeout(() => {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 0.88; u.pitch = 1.1; u.volume = 1.0;
     if (_ttsVoice) u.voice = _ttsVoice;
-    u.onstart  = () => { _ttsSpeaking = true; if (showSpeaker) $('challenge-prompt')?.classList.add('speaking'); };
-    u.onend = u.onerror = () => {
+
+    let _fired = false;
+    const _finish = () => {
+      if (_fired) return;
+      _fired = true;
+      clearTimeout(_watchdog);
       _ttsSpeaking = false;
       if (showSpeaker) $('challenge-prompt')?.classList.remove('speaking');
       onEnd?.();
     };
+    // iOS Safari sometimes never fires onend — give it 15 s then move on
+    const _watchdog = setTimeout(_finish, 15000);
+
+    u.onstart  = () => { _ttsSpeaking = true; if (showSpeaker) $('challenge-prompt')?.classList.add('speaking'); };
+    u.onend    = _finish;
+    u.onerror  = _finish;
     window.speechSynthesis.speak(u);
   }, 80);
 }
@@ -1913,7 +1996,7 @@ function loadChallenge() {
 
   // Set prompt text while preserving the speaker icon
   const promptEl = $('challenge-prompt');
-  promptEl.innerHTML = `<i class="speak-icon">🔈</i>${promptText}`;
+  promptEl.innerHTML = `<i class="speak-icon">🔈</i>${promptText}<span class="tts-dots"><span></span><span></span><span></span></span>`;
 
   // Build answer buttons first (hidden until question finishes)
   const options = shuffle([ch.correct, ...ch.distractors]);
@@ -1927,6 +2010,7 @@ function loadChallenge() {
   `).join('');
   grid.classList.remove('ready');
   grid.classList.add('waiting');
+  promptEl.classList.add('loading');
 
   // Auto-read question; reveal answers only when TTS finishes
   const spokenText = promptText
@@ -1935,11 +2019,21 @@ function loadChallenge() {
     .replace('Find number', 'Which one is the number')
     .replace(/[!]$/, '?');
 
-  speakText(spokenText, () => {
+  // Safety net: if TTS never calls back (API error, iOS audio block, etc.)
+  // reveal answers after 10 s so the child is never stuck.
+  const _revealAnswers = () => {
+    clearTimeout(_safetyTimer);
+    promptEl.classList.remove('loading');
     grid.classList.remove('waiting');
     grid.classList.add('ready');
-    startIdleTimer();   // idle countdown starts only after question has been read
-  }, TTS_VOICE.question, true);
+    startIdleTimer();
+  };
+  const _safetyTimer = setTimeout(() => {
+    console.warn('[challenge] TTS safety timeout — force-revealing answers');
+    _revealAnswers();
+  }, 10000);
+
+  speakText(spokenText, _revealAnswers, TTS_VOICE.question, true);
 }
 
 // =========================================
