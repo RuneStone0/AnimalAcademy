@@ -10,6 +10,11 @@ Runs entirely offline from a single HTML file — no server, no build step, no d
 
 ---
 
+## Demo
+
+https://runestone0.github.io/AnimalAcademy/src/
+
+---
 ## How to play
 
 1. Tap **Let's Play!** and listen to the introduction
@@ -77,6 +82,7 @@ python -m http.server 3456
 - **iPad optimised** — large touch targets, spring animations, no zoom
 
 ---
+
 
 ## File structure
 
