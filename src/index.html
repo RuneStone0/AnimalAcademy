@@ -181,6 +181,111 @@
     }
     .btn-reset-level:active { background: rgba(255,255,255,0.38); }
 
+    /* ── About button (info icon, bottom-right of welcome screen) ── */
+    .btn-about {
+      position: fixed;
+      bottom: 18px; left: 18px;
+      font-size: 22px;
+      background: rgba(255,255,255,0.22);
+      border: 2px solid rgba(255,255,255,0.45);
+      border-radius: 50%;
+      width: 52px; height: 52px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      color: #fff;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s, opacity 0.3s;
+      z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #app[data-state="WELCOME"] .btn-about {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .btn-about:active { background: rgba(255,255,255,0.40); }
+
+    /* ── About modal overlay ── */
+    .about-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .about-overlay.open {
+      opacity: 1; pointer-events: auto;
+    }
+    .about-card {
+      background: #fff;
+      border-radius: 28px;
+      padding: 36px 40px;
+      max-width: 480px; width: 88%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+      text-align: center;
+      font-family: var(--font);
+      display: flex; flex-direction: column; align-items: center; gap: 14px;
+      transform: scale(0.88);
+      transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .about-overlay.open .about-card { transform: scale(1); }
+    .about-logo { font-size: 52px; line-height: 1; }
+    .about-title {
+      font-size: clamp(22px, 4vw, 28px);
+      font-weight: 900;
+      color: #333;
+      margin: 0;
+    }
+    .about-version {
+      font-size: 13px;
+      font-weight: 700;
+      color: #aaa;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .about-msg {
+      font-size: clamp(14px, 2.5vw, 17px);
+      color: #555;
+      line-height: 1.55;
+      margin: 0;
+    }
+    .about-links {
+      display: flex; flex-direction: column; gap: 10px;
+      width: 100%;
+    }
+    .about-link {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px 20px;
+      border-radius: 14px;
+      font-size: 15px; font-weight: 700;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .about-link.github {
+      background: #f0f0f0; color: #222;
+    }
+    .about-link.github:hover { background: #e2e2e2; }
+    .about-link.twitter {
+      background: #e8f4fd; color: #1a8cd8;
+    }
+    .about-link.twitter:hover { background: #d5eaf8; }
+    .about-close {
+      margin-top: 4px;
+      padding: 10px 32px;
+      background: #FF6B35; color: #fff;
+      border: none; border-radius: 40px;
+      font-size: 16px; font-weight: 900; font-family: var(--font);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 4px 0 #C43000;
+      transition: transform 0.08s, box-shadow 0.08s;
+    }
+    .about-close:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #C43000;
+    }
+
     /* Level badge on game screen */
     .level-badge {
       position: absolute;
@@ -292,24 +397,23 @@
       z-index: 1;
     }
 
-    /* Step dots + destination icon */
+    /* Step dots + destination icon — all absolutely positioned so they
+       share the same coordinate space as .animal-walker */
     .track-markers {
       position: absolute;
-      bottom: 10px;
-      left: 48px; right: 48px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
+      inset: 0;
       z-index: 2;
-      padding: 0 6px;
+      pointer-events: none;
     }
 
     .track-dot {
+      position: absolute;
+      bottom: 10px;
+      transform: translateX(-50%);   /* left is set per-dot inline by JS */
       width:  34px; height: 34px;
       border-radius: 50%;
       background: var(--dot-empty);
       border: 4px solid var(--track-brd);
-      flex-shrink: 0;
       transition: background 0.25s, border-color 0.25s;
     }
 
@@ -320,15 +424,18 @@
     }
 
     @keyframes dot-pop {
-      0%   { transform: scale(1);    }
-      55%  { transform: scale(1.55); }
-      100% { transform: scale(1.15); }
+      /* must include translateX(-50%) so it doesn't clobber our centering */
+      0%   { transform: translateX(-50%) scale(1);    }
+      55%  { transform: translateX(-50%) scale(1.55); }
+      100% { transform: translateX(-50%) scale(1.15); }
     }
 
     .track-dest-icon {
+      position: absolute;
+      bottom: 6px;
+      transform: translateX(-50%);   /* left set inline by JS */
       font-size: clamp(36px, 6vw, 50px);
       line-height: 1;
-      flex-shrink: 0;
       filter: drop-shadow(2px 4px 5px rgba(0,0,0,0.22));
     }
 
@@ -518,27 +625,6 @@
     .answer-grid.waiting .answer-btn:nth-child(2) { animation: btn-shimmer 1.3s ease-in-out infinite 0.2s; }
     .answer-grid.waiting .answer-btn:nth-child(3) { animation: btn-shimmer 1.3s ease-in-out infinite 0.4s; }
 
-    /* Bouncing dots on challenge prompt while TTS fetch is in-flight */
-    @keyframes dot-bounce {
-      0%, 80%, 100% { transform: translateY(0);    opacity: 0.45; }
-      40%            { transform: translateY(-6px); opacity: 1.00; }
-    }
-    .tts-dots {
-      display: none;
-      gap: 5px;
-      margin-left: 6px;
-      vertical-align: middle;
-    }
-    .tts-dots span {
-      display: inline-block;
-      width: 9px; height: 9px;
-      border-radius: 50%;
-      background: currentColor;
-      animation: dot-bounce 1.1s ease-in-out infinite;
-    }
-    .tts-dots span:nth-child(2) { animation-delay: 0.18s; }
-    .tts-dots span:nth-child(3) { animation-delay: 0.36s; }
-    #challenge-prompt.loading .tts-dots { display: inline-flex; }
 
     .color-swatch {
       width: 68px; height: 68px;
@@ -758,9 +844,9 @@
     @media (orientation: landscape) and (max-height: 500px) {
       .track-area    { height: 100px; margin-top: 4px; }
       .track-road    { bottom: 16px; height: 16px; }
-      .track-markers { bottom: 5px; }
+      .track-dot     { bottom: 5px; width: 26px; height: 26px; }
+      .track-dest-icon { bottom: 2px; }
       .animal-walker { bottom: 36px; }
-      .track-dot     { width: 26px; height: 26px; }
     }
 
     /* =========================================
@@ -927,6 +1013,41 @@
     <button class="btn-reset-level js-reset-level">⚙️ Reset Level</button>
   </section>
 
+  <!-- About button (always in DOM, only visible on WELCOME screen via CSS) -->
+  <button class="btn-about js-about" aria-label="About">ℹ️</button>
+
+  <!-- About modal -->
+  <div class="about-overlay js-about-overlay">
+    <div class="about-card">
+      <div class="about-logo">🦆🐘🐒</div>
+      <h2 class="about-title">Animal Academy</h2>
+      <p class="about-version">Version 1.0</p>
+      <p class="about-msg">
+        Vibe coded with ❤️ and dedicated to my kids.<br>
+        May every question spark a little joy.
+      </p>
+      <div class="about-links">
+        <a class="about-link github"
+           href="https://github.com/RuneStone0/AnimalAcademy"
+           target="_blank" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 .3C5.37.3 0 5.67 0 12.3c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.72-4.04-1.61-4.04-1.61-.54-1.38-1.33-1.75-1.33-1.75-1.09-.74.08-.73.08-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 3-.4c1.02.005 2.04.14 3 .4 2.28-1.55 3.3-1.23 3.3-1.23.64 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.3c0 .32.22.7.83.58C20.57 22.1 24 17.6 24 12.3 24 5.67 18.63.3 12 .3z"/>
+          </svg>
+          GitHub — source code
+        </a>
+        <a class="about-link twitter"
+           href="https://x.com/r0ck3t23/status/2042975419687723212"
+           target="_blank" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+          Inspiration post on X
+        </a>
+      </div>
+      <button class="about-close js-about-close">Close</button>
+    </div>
+  </div>
+
   <!-- ==================== SELECT ANIMAL ==================== -->
   <section class="screen screen-select">
     <h2 class="prompt-title">Pick your hero!</h2>
@@ -1007,7 +1128,7 @@
   <section class="screen screen-win">
     <!-- Video reward (shown when Grok video is ready) -->
     <div class="win-video-wrap" id="win-video-wrap">
-      <video id="win-video" autoplay loop playsinline muted="false"></video>
+      <video id="win-video" loop playsinline></video>
     </div>
     <!-- Classic win animation (shown when no video) -->
     <div class="win-destination" id="win-destination">
@@ -1089,32 +1210,32 @@ const REWARDS = [
   {
     id: 'fart', emoji: '💨', label: 'Big Fart!', winText: '💨 LET IT RIP! 🎉',
     loadMsg: 'Loading up the gas tanks... 💨',
-    prompt: name => `A silly cute cartoon ${name} doing a huge magical fart with colorful gas clouds and bubbles, funny kids animation style, vibrant bright colors, joyful`,
+    prompt: name => `Seamlessly looping video. A photorealistic ${name} repeatedly lets out a massive fart, green gas cloud billowing and dissipating, the ${name} looking smug each time, other animals fanning the air in disgust, the action cycles back to the start, cinematic wide shot, hilarious`,
   },
   {
     id: 'splash', emoji: '🌊', label: 'Cannonball!', winText: '🌊 CANNONBALL! 💦',
     loadMsg: 'Filling up the pool... 🌊',
-    prompt: name => `A cute cartoon ${name} jumping high and doing a huge cannonball into a swimming pool making an enormous splash with water everywhere, kids animation style, bright cheerful colors`,
+    prompt: name => `Seamlessly looping video. A photorealistic ${name} leaps off a high diving board, cannonballs into a sparkling pool with an enormous splash, slow-motion water spray catching sunlight, then the ${name} resurfaces grinning and the scene resets perfectly, cinematic summer afternoon`,
   },
   {
     id: 'rocket', emoji: '🚀', label: 'To Space!', winText: '🚀 BLAST OFF! ⭐',
     loadMsg: 'Counting down to launch... 🚀',
-    prompt: name => `A cute cartoon ${name} riding a colorful rocket ship blasting off into outer space surrounded by stars and colorful planets, kids animation style, exciting and joyful`,
+    prompt: name => `Seamlessly looping video. A photorealistic ${name} in an astronaut helmet riding a rocket that blasts off with a thunderous roar and blazing engines, soars through clouds into a star-filled sky, loops back to the launchpad countdown, epic cinematic NASA style`,
   },
   {
     id: 'dance', emoji: '🕺', label: 'Dance Party!', winText: '🕺 DANCE PARTY! 🎉',
     loadMsg: 'Setting up the disco lights... 🕺',
-    prompt: name => `A cute cartoon ${name} doing a silly funny victory dance with disco lights, confetti and balloons everywhere, kids animation style, colorful and joyful`,
+    prompt: name => `Seamlessly looping video. A photorealistic ${name} dancing on a nightclub floor under a spinning disco ball, laser lights sweeping, confetti raining down, the ${name} busting ridiculous moves that cycle back to the start, cinematic music video style, charismatic and hilarious`,
   },
   {
     id: 'rainbow', emoji: '🌈', label: 'Rainbow Slide!', winText: '🌈 WHEEEEE! 🎊',
     loadMsg: 'Painting the rainbow... 🌈',
-    prompt: name => `A cute cartoon ${name} joyfully sliding down a giant rainbow laughing with delight, magical colorful clouds and sunshine, kids animation style, whimsical and happy`,
+    prompt: name => `Seamlessly looping video. A photorealistic ${name} surfing down a giant rainbow arc above golden clouds, wind whipping, huge grin on its face, reaches the bottom and magically zooms back to the top to ride again, cinematic aerial shot, exhilarating and epic`,
   },
   {
     id: 'icecream', emoji: '🍦', label: 'Ice Cream!', winText: '🍦 YUMMY YUMMY! 😋',
     loadMsg: 'Scooping the ice cream... 🍦',
-    prompt: name => `A cute cartoon ${name} eating a giant towering colorful ice cream cone with many scoops and rainbow sprinkles, happy and delighted, kids animation style, bright and cheerful`,
+    prompt: name => `Seamlessly looping video. A photorealistic ${name} at an ice cream parlour takes one lick of a towering 20-scoop cone, the whole thing topples in slow motion covering the ${name} in ice cream, the ${name} licks its face delighted and a fresh cone magically reappears, cinematic and hilariously messy`,
   },
 ];
 
@@ -1330,6 +1451,26 @@ function getCtx() {
 // prime a silent HTML5 Audio element so subsequent new Audio().play() calls
 // are allowed even inside async callbacks (fetch → blob → Audio).
 let _audioUnlocked = false;
+let _welcomeVoiceStarted = false;
+
+function _playWelcomeVoice() {
+  if (_welcomeVoiceStarted) return;
+  _welcomeVoiceStarted = true;
+
+  // Inline play so we can reset the flag if autoplay is blocked (mobile),
+  // allowing _unlockAudio to retry on first user interaction.
+  const aud = new Audio(V.welcome());
+  _ttsAudio = aud; _ttsSpeaking = true;
+  aud.onended = () => { _ttsAudio = null; _ttsSpeaking = false; };
+  aud.onerror = () => { _ttsAudio = null; _ttsSpeaking = false; _welcomeVoiceStarted = false; };
+  aud.play().then(() => {
+    startBgMusic();
+  }).catch(() => {
+    _ttsAudio = null; _ttsSpeaking = false;
+    _welcomeVoiceStarted = false; // reset so _unlockAudio can retry after first touch
+  });
+}
+
 function _unlockAudio() {
   if (_audioUnlocked) return;
   _audioUnlocked = true;
@@ -1341,6 +1482,7 @@ function _unlockAudio() {
     src.connect(ctx.destination);
     src.start(0);
   } catch (e) {}
+  _playWelcomeVoice();
 }
 document.addEventListener('touchstart', _unlockAudio, { once: true, passive: true });
 document.addEventListener('click',      _unlockAudio, { once: true });
@@ -1573,7 +1715,7 @@ function initTTS() {
   window.speechSynthesis.addEventListener('voiceschanged', pickVoice);
 }
 
-// Cancel any in-flight TTS audio
+// Cancel any in-flight voice audio
 function stopTTS() {
   if (_ttsAudio) { _ttsAudio.pause(); _ttsAudio = null; }
   window.speechSynthesis?.cancel();
@@ -1581,169 +1723,85 @@ function stopTTS() {
   $('challenge-prompt')?.classList.remove('speaking');
 }
 
-// Convert a Blob to a base64 data URL (for localStorage caching)
-function _blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload  = () => resolve(r.result);
-    r.onerror = reject;
-    r.readAsDataURL(blob);
-  });
-}
+// =========================================
+// VOICE — pre-generated local MP3 files
+// All clips live in voices/ (run scripts/generate-voices.js once to create them).
+// Falls back gracefully if a file is missing.
+// =========================================
 
-// Play an audio data URL (base64) and call onEnd when done
-function _playDataUrl(dataUrl, onEnd) {
-  const aud = new Audio(dataUrl);
-  _ttsAudio    = aud;
-  _ttsSpeaking = true;
-  aud.onended = () => { _ttsAudio = null; _ttsSpeaking = false; onEnd?.(); };
-  aud.onerror = () => { _ttsAudio = null; _ttsSpeaking = false; onEnd?.(); };
-  aud.play().catch(() => { _ttsAudio = null; _ttsSpeaking = false; onEnd?.(); });
-}
+// Map every in-game voice moment to its local file path.
+// Counts must match the number of files generated by generate-voices.js.
+const V = {
+  welcome:       ()      => 'voices/welcome.mp3',
+  question:      ch      => `voices/q_${ch.correct.id}.mp3`,
+  cheer:         ()      => `voices/cheer_${Math.floor(Math.random() * 8)}.mp3`,
+  comfort:       ()      => `voices/comfort_${Math.floor(Math.random() * 5)}.mp3`,
+  comfortDouble: ()      => 'voices/comfort_double.mp3',
+  win:           animal  => `voices/win_${animal}.mp3`,
+  dest:          destId  => `voices/dest_${destId}.mp3`,
+  hype:          animal  => `voices/hype_${animal}_${Math.floor(Math.random() * 3)}.mp3`,
+  idleT1:        ch      => `voices/idle_t1_${ch.correct.id}_${Math.floor(Math.random() * 5)}.mp3`,
+  idleT2:        ch      => `voices/idle_t2_${ch.correct.id}_${Math.floor(Math.random() * 4)}.mp3`,
+};
 
-// Like speakText but caches the audio in localStorage under `tts_cache_{key}`.
-// Use for lines that are always the same (e.g. welcome intro) to avoid regenerating.
-async function speakCached(cacheKey, text, onEnd, voiceId = TTS_VOICE.hype) {
+// Play a local voice file. Calls onEnd when done (or immediately on error so
+// the game never gets stuck). showSpeaker pulses the 🔈 icon while playing.
+function playVoice(filePath, onEnd, showSpeaker = false) {
   stopTTS();
-  const storageKey = `tts_cache_${cacheKey}`;
-  const cached = localStorage.getItem(storageKey);
-  if (cached) { _playDataUrl(cached, onEnd); return; }
+  if (showSpeaker) $('challenge-prompt')?.classList.add('speaking');
 
-  const clean = text.replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{27BF}]/gu, '').replace(/!/g, '.').trim();
-  try {
-    const res = await fetch('https://api.x.ai/v1/tts', {
-      method:  'POST',
-      headers: { 'Authorization': `Bearer ${GROK_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: clean, voice_id: voiceId, language: 'en',
-                             output_format: { codec: 'mp3', sample_rate: 24000 } }),
-    });
-    if (!res.ok) throw new Error(`TTS ${res.status}`);
-    const dataUrl = await _blobToDataUrl(await res.blob());
-    localStorage.setItem(storageKey, dataUrl);
-    _playDataUrl(dataUrl, onEnd);
-  } catch (e) {
-    console.warn('[tts] speakCached failed:', e.message);
-    _speakFallback(clean, onEnd);
-  }
+  const aud = new Audio(filePath);
+  _ttsAudio = aud; _ttsSpeaking = true;
+
+  const _finish = () => {
+    _ttsAudio = null; _ttsSpeaking = false;
+    if (showSpeaker) $('challenge-prompt')?.classList.remove('speaking');
+    onEnd?.();
+  };
+  const _error = () => {
+    console.warn('[voice] failed to load:', filePath);
+    _ttsAudio = null; _ttsSpeaking = false;
+    if (showSpeaker) $('challenge-prompt')?.classList.remove('speaking');
+    onEnd?.();   // continue the game silently rather than getting stuck
+  };
+
+  aud.onended = _finish;
+  aud.onerror = _error;
+  aud.play().catch(_error);
 }
 
-// Speak via Grok TTS; falls back to Web Speech API on error
-// voiceId: one of TTS_VOICE.* ('eve', 'ara', 'leo', 'rex', 'sal')
-// showSpeaker: whether to pulse the 🔈 icon (true for challenge prompts)
-async function speakText(text, onEnd, voiceId = TTS_VOICE.question, showSpeaker = false) {
-  const clean = text
-    .replace(/[\u{1F000}-\u{1FFFF}|\u{2600}-\u{27BF}]/gu, '')  // strip emoji
-    .replace(/!/g, '.')                                           // ! → . (avoid "factorial")
-    .trim();
-  if (!clean) { onEnd?.(); return; }
-
-  stopTTS();  // cancel anything already playing
-
-  // Show loading dots while fetch is in-flight
-  if (showSpeaker) {
-    $('challenge-prompt')?.classList.add('loading');
-    $('challenge-prompt')?.classList.remove('speaking');
-  }
-
-  try {
-    // Abort the fetch if it takes more than 10 s (e.g. slow mobile network)
-    const controller   = new AbortController();
-    const fetchTimeout = setTimeout(() => controller.abort(), 10000);
-
-    const res = await fetch('https://api.x.ai/v1/tts', {
-      signal: controller.signal,
-      method:  'POST',
-      headers: {
-        'Authorization': `Bearer ${GROK_API_KEY}`,
-        'Content-Type':  'application/json',
-      },
-      body: JSON.stringify({
-        text:     clean,
-        voice_id: voiceId,
-        language: 'en',
-        output_format: { codec: 'mp3', sample_rate: 24000 },
-      }),
-    });
-    clearTimeout(fetchTimeout);
-
-    if (!res.ok) throw new Error(`Grok TTS ${res.status}: ${await res.text().catch(() => '')}`);
-
-    const blob = await res.blob();
-    const url  = URL.createObjectURL(blob);
-    const aud  = new Audio(url);
-    _ttsAudio    = aud;
-    _ttsSpeaking = true;
-    // Fetch done — switch from loading dots to speaking pulse
-    if (showSpeaker) {
-      $('challenge-prompt')?.classList.remove('loading');
-      $('challenge-prompt')?.classList.add('speaking');
-    }
-
-    aud.onended = () => {
-      URL.revokeObjectURL(url);
-      _ttsAudio    = null;
-      _ttsSpeaking = false;
-      if (showSpeaker) $('challenge-prompt')?.classList.remove('speaking');
-      onEnd?.();
-    };
-    aud.onerror = () => {
-      URL.revokeObjectURL(url);
-      _ttsAudio    = null;
-      _ttsSpeaking = false;
-      if (showSpeaker) $('challenge-prompt')?.classList.remove('loading', 'speaking');
-      _speakFallback(clean, onEnd, showSpeaker);
-    };
-    aud.play().catch(() => {
-      if (showSpeaker) $('challenge-prompt')?.classList.remove('loading', 'speaking');
-      _speakFallback(clean, onEnd, showSpeaker);
-    });
-
-  } catch (e) {
-    console.warn('[tts] Grok TTS error, using fallback:', e.message);
-    if (showSpeaker) $('challenge-prompt')?.classList.remove('loading', 'speaking');
-    _speakFallback(clean, onEnd, showSpeaker);
-  }
-}
-
-// Web Speech API fallback (used when Grok TTS is unavailable or offline)
-// Includes a watchdog timer for iOS Safari, which sometimes never fires onend.
+// Web Speech API — used only when voice files are completely absent (e.g. dev mode)
 function _speakFallback(text, onEnd, showSpeaker = false) {
-  if (showSpeaker) $('challenge-prompt')?.classList.remove('loading');
-  if (!window.speechSynthesis) { onEnd?.(); return; }
+  if (!window.speechSynthesis || !text) { onEnd?.(); return; }
   window.speechSynthesis.cancel();
   setTimeout(() => {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 0.88; u.pitch = 1.1; u.volume = 1.0;
     if (_ttsVoice) u.voice = _ttsVoice;
-
     let _fired = false;
     const _finish = () => {
-      if (_fired) return;
-      _fired = true;
+      if (_fired) return; _fired = true;
       clearTimeout(_watchdog);
       _ttsSpeaking = false;
       if (showSpeaker) $('challenge-prompt')?.classList.remove('speaking');
       onEnd?.();
     };
-    // iOS Safari sometimes never fires onend — give it 15 s then move on
-    const _watchdog = setTimeout(_finish, 15000);
-
-    u.onstart  = () => { _ttsSpeaking = true; if (showSpeaker) $('challenge-prompt')?.classList.add('speaking'); };
-    u.onend    = _finish;
-    u.onerror  = _finish;
+    const _watchdog = setTimeout(_finish, 15000);   // iOS Safari onend watchdog
+    u.onstart = () => { _ttsSpeaking = true; if (showSpeaker) $('challenge-prompt')?.classList.add('speaking'); };
+    u.onend   = _finish;
+    u.onerror = _finish;
     window.speechSynthesis.speak(u);
   }, 80);
 }
 
+// Re-read the current question aloud (tap on challenge prompt)
 function speakChallenge() {
-  const el = $('challenge-prompt');
-  if (!el) return;
-  const text = el.textContent.replace('🔈', '').trim();
-  speakText(text, null, TTS_VOICE.question, true);
+  if (_activeChallenge) playVoice(V.question(_activeChallenge), null, true);
 }
 
-function speakWinText(text) {
-  speakText(text, null, TTS_VOICE.cheer);
+// Read the destination win text on the win screen
+function speakWinText() {
+  playVoice(V.dest(gs.destination.id));
 }
 
 // =========================================
@@ -1906,9 +1964,12 @@ function renderTrack() {
   let html = '';
   for (let i = 0; i < steps; i++) {
     const done = i < gs.position ? ' done' : '';
-    html += `<div class="track-dot${done}"></div>`;
+    // Use the same formula as positionAnimal so dot and animal are always aligned
+    const pct  = (5 + (i / steps) * 80).toFixed(2);
+    html += `<div class="track-dot${done}" style="left:${pct}%"></div>`;
   }
-  html += `<div class="track-dest-icon">${gs.destination.emoji}</div>`;
+  // Destination sits just past the last dot, at the right end of the travel range
+  html += `<div class="track-dest-icon" style="left:97%">${gs.destination.emoji}</div>`;
   markers.innerHTML = html;
 
   $('level-badge').textContent = `⭐ Level ${diff.level}`;
@@ -1980,8 +2041,8 @@ function clearIdleTimer() {
 function _onIdle() {
   if (!_activeChallenge || gs.state !== STATES.PLAYING) return;
   _idleCount++;
-  const pool = _idleCount === 1 ? IDLE_TIER1 : IDLE_TIER2;
-  speakText(pick(pool)(_activeChallenge), null, TTS_VOICE.question, true);
+  const path = _idleCount === 1 ? V.idleT1(_activeChallenge) : V.idleT2(_activeChallenge);
+  playVoice(path, null, true);
   if (_idleCount < 2) _idleTimer = setTimeout(_onIdle, 18000);
   // After 2 nudges we stop — kid may have wandered off
 }
@@ -1996,7 +2057,7 @@ function loadChallenge() {
 
   // Set prompt text while preserving the speaker icon
   const promptEl = $('challenge-prompt');
-  promptEl.innerHTML = `<i class="speak-icon">🔈</i>${promptText}<span class="tts-dots"><span></span><span></span><span></span></span>`;
+  promptEl.innerHTML = `<i class="speak-icon">🔈</i>${promptText}`;
 
   // Build answer buttons first (hidden until question finishes)
   const options = shuffle([ch.correct, ...ch.distractors]);
@@ -2010,30 +2071,20 @@ function loadChallenge() {
   `).join('');
   grid.classList.remove('ready');
   grid.classList.add('waiting');
-  promptEl.classList.add('loading');
 
-  // Auto-read question; reveal answers only when TTS finishes
-  const spokenText = promptText
-    .replace('Find the color', 'Hey! Can you find the color')
-    .replace('Find the', 'Can you spot the')
-    .replace('Find number', 'Which one is the number')
-    .replace(/[!]$/, '?');
-
-  // Safety net: if TTS never calls back (API error, iOS audio block, etc.)
-  // reveal answers after 10 s so the child is never stuck.
+  // Safety net: if the audio file fails to load, reveal answers after 5 s.
   const _revealAnswers = () => {
     clearTimeout(_safetyTimer);
-    promptEl.classList.remove('loading');
     grid.classList.remove('waiting');
     grid.classList.add('ready');
     startIdleTimer();
   };
   const _safetyTimer = setTimeout(() => {
-    console.warn('[challenge] TTS safety timeout — force-revealing answers');
+    console.warn('[challenge] voice safety timeout — force-revealing answers');
     _revealAnswers();
-  }, 10000);
+  }, 5000);
 
-  speakText(spokenText, _revealAnswers, TTS_VOICE.question, true);
+  playVoice(V.question(ch), _revealAnswers, true);
 }
 
 // =========================================
@@ -2191,12 +2242,13 @@ function playWin() {
     };
 
     videoEl.src = gs.rewardVideoUrl;
-    videoEl.play().catch(() => {});
+    videoEl.muted = false;
+    videoEl.play().catch(() => { videoEl.muted = true; videoEl.play().catch(() => {}); });
 
     sndWin();
     spawnStars();
 
-    setTimeout(() => { textEl.classList.add('visible'); speakWinText(winText); }, 600);
+    setTimeout(() => { textEl.classList.add('visible'); speakWinText(); }, 600);
     setTimeout(() => lvlMsgEl.classList.add('visible'), 1000);
     setTimeout(() => btnsEl.classList.add('visible'),   1500);
 
@@ -2219,7 +2271,7 @@ function playWin() {
       spawnStars();
     }, 560);
 
-    setTimeout(() => { textEl.classList.add('visible'); speakWinText(winText); }, 850);
+    setTimeout(() => { textEl.classList.add('visible'); speakWinText(); }, 850);
     setTimeout(() => lvlMsgEl.classList.add('visible'), 1100);
     setTimeout(() => btnsEl.classList.add('visible'),   1600);
   }
@@ -2269,7 +2321,7 @@ function go(newState) {
           setTimeout(() => { gs.animLocked = false; go(STATES.PLAYING); }, 500);
         }
       };
-      speakText(pick(CHEER_LINES), () => { _cvDone = true; _onCorrectDone(); }, TTS_VOICE.cheer);
+      playVoice(V.cheer(), () => { _cvDone = true; _onCorrectDone(); });
       playCorrect(() => { _caDone = true; _onCorrectDone(); });
       break;
     }
@@ -2292,10 +2344,7 @@ function go(newState) {
         }
         setTimeout(() => { gs.animLocked = false; go(STATES.PLAYING); }, 500);
       };
-      const comfortLine = isSecondWrong
-        ? 'Oh no, two in a row. Let\'s move back and try again.'
-        : pick(COMFORT_LINES);
-      speakText(comfortLine, () => { _wvDone = true; _onWrongDone(); }, TTS_VOICE.comfort);
+      playVoice(isSecondWrong ? V.comfortDouble() : V.comfort(), () => { _wvDone = true; _onWrongDone(); });
       playWrong(isSecondWrong, () => { _waDone = true; _onWrongDone(); });
       break;
     }
@@ -2319,10 +2368,7 @@ function go(newState) {
 
       sndWin();
       spawnStars();
-      speakText(
-        `WOW! You did it! Amazing job! Now pick what ${ANIMALS[gs.animal].name} should do to celebrate!`,
-        null, TTS_VOICE.hype
-      );
+      playVoice(V.win(gs.animal));
       break;
     }
 
@@ -2374,18 +2420,13 @@ function go(newState) {
 
 function initGame() {
 
-  // Welcome → intro voice → Select animal
+  // Welcome → Select animal
+  // The welcome voice plays on first interaction via _unlockAudio — this handler
+  // just navigates. The voice carries over into SELECT_ANIMAL and is overridden
+  // naturally when the animal hype line starts.
   document.querySelector('.js-start').addEventListener('click', () => {
     sndTap();
-    startBgMusic();
-
-    // Cached intro — generated once, replayed from localStorage after that
-    speakCached(
-      'welcome_intro',
-      'Welcome to Animal Adventure. Pick your hero and let\'s go on an adventure together.',
-      () => go(STATES.SELECT_ANIMAL),
-      TTS_VOICE.hype
-    );
+    go(STATES.SELECT_ANIMAL);
   });
 
   // Pick animal
@@ -2406,14 +2447,7 @@ function initGame() {
       renderTrack();
 
       // Short voice hype before first question
-      const animalName = ANIMALS[a].name;
-      const dest       = gs.destination;
-      const pickLines  = [
-        `${animalName}! Great choice! Let's help ${animalName} get to the ${dest.emoji}!`,
-        `Woohoo! ${animalName} is ready! Answer the questions and ${animalName} will walk all the way there!`,
-        `${animalName}! Awesome! Let's go! Answer right and ${animalName} takes a step closer!`,
-      ];
-      speakText(pick(pickLines), () => go(STATES.PLAYING), TTS_VOICE.hype);
+      playVoice(V.hype(a), () => go(STATES.PLAYING));
     });
   });
 
@@ -2494,6 +2528,20 @@ function initGame() {
   $('challenge-prompt').addEventListener('click', () => {
     if (gs.state === 'PLAYING') speakChallenge();
   });
+
+  // About modal
+  const aboutOverlay = document.querySelector('.js-about-overlay');
+  document.querySelector('.js-about').addEventListener('click', () => {
+    sndTap();
+    aboutOverlay.classList.add('open');
+  });
+  document.querySelector('.js-about-close').addEventListener('click', () => {
+    sndTap();
+    aboutOverlay.classList.remove('open');
+  });
+  aboutOverlay.addEventListener('click', e => {
+    if (e.target === aboutOverlay) aboutOverlay.classList.remove('open');
+  });
 }
 
 // =========================================
@@ -2504,6 +2552,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initMuteBtn();
   initTTS();
   initGame();
+  // Welcome voice fires on first user interaction via _unlockAudio (touchstart / click).
+  // Attempting autoplay here races with the browser autoplay policy and caused the
+  // _welcomeVoiceStarted flag to get stuck true before audio was actually unlocked.
 });
 </script>
 </body>
